@@ -22,7 +22,7 @@ DEMO_SONG_SRC ?= songs/axelf.vtms
 DEMO_IMAGE    ?= songs/DEMO.VBM
 PLAYER_DATA   = demo.vtm.prg $(if $(NO_IMAGE),,demo.vbm.prg)
 
-PRGS = testfx.prg testirq.prg $(TEXT_PRGS) testplr.prg $(PLAYER_DATA)
+PRGS = testfx.prg testirq.prg $(TEXT_PRGS) testplr.prg $(PLAYER_DATA) vic_mirror.prg
 
 .PHONY: all clean
 all: $(PRGS)
@@ -49,6 +49,9 @@ $(foreach m,$(MODES),$(eval $(call text_test,testmtx,test_matrix.c,$(m))))
 
 testplr.prg: test_player.c vtm_loader.c vbm_loader.c vtm_player.o vbm_display.o vtm.h vbm.h c64-zp.cfg $(HEADERS)
 	$(CL65) $(CFLAGS) -C c64-zp.cfg -o $@ test_player.c vtm_loader.c vbm_loader.c vtm_player.o vbm_display.o
+
+vic_mirror.prg: vic_mirror.c $(HEADERS)
+	$(CL65) $(CFLAGS) -o $@ $<
 
 vtm_player.o: vtm_notes.inc
 
