@@ -1,0 +1,8 @@
+# build outputs
+*.o
+*.prg
+*.map
+*.lbl
+*.d64
+/rmt/gen/
+/driver/gen/
