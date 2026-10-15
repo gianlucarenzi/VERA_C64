@@ -117,6 +117,7 @@ x64sc -vera -autostart rmt/rmtplay.prg &
 
 - **[driver/README.md](driver/README.md)** - Screen driver architecture, memory layout, limitations
 - **[rmt/BUILD_GUIDE.md](rmt/BUILD_GUIDE.md)** - How to compile RMT player with specific songs
+- **[VIC_MIRROR_GUIDE.md](VIC_MIRROR_GUIDE.md)** - VIC-II screen mirroring techniques and examples
 - **[Documentation/](Documentation/)** - VERA technical references and X16 specs
 
 ### VERA Resources
@@ -132,6 +133,7 @@ VERA_C64/
 ├── README.md                                    # This file
 ├── LICENSE                                      # BSD 2-Clause License
 ├── Makefile                                     # Main build system
+├── VIC_MIRROR_GUIDE.md                         # VIC-II mirroring techniques
 │
 ├── driver/                                      # VERA Screen Driver
 │   ├── README.md                               # Driver documentation
@@ -163,7 +165,8 @@ VERA_C64/
 │   └── gen/                                    # Generated files
 │
 ├── tests/                                       # Test Suite
-│   └── [Various test programs]
+│   ├── vic_mirror.c                            # VIC-II mirroring example
+│   └── [Various other test programs]
 │
 ├── include/                                     # C/ASM Headers
 │   ├── vera.h                                  # VERA C API
