@@ -3,6 +3,7 @@
 #
 #   make                  build everything and vera-c64.d64
 #   make VERA_BASE=0xDF00 the card in IO2 instead of IO1
+#   make NO_IMAGE=        also tests/demo.vbm.prg (does not fit on the D64)
 #   make run              start VICE with the card and the disk
 #   make clean
 

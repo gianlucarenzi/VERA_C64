@@ -20,6 +20,9 @@ TEXT_PRGS = $(foreach t,$(TEXT_TESTS),$(foreach m,$(MODES),$(t)$(m).prg))
 # Makefile writes every *.prg under its name without ".prg")
 DEMO_SONG_SRC ?= songs/axelf.vtms
 DEMO_IMAGE    ?= songs/DEMO.VBM
+# demo.vbm.prg (305 blocks) does not fit on the D64 with the other PRGs:
+# left out by default, NO_IMAGE= builds it
+NO_IMAGE      ?= 1
 PLAYER_DATA   = demo.vtm.prg $(if $(NO_IMAGE),,demo.vbm.prg)
 
 PRGS = testfx.prg testirq.prg $(TEXT_PRGS) testplr.prg $(PLAYER_DATA) vic_mirror.prg
