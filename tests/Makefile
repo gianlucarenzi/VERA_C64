@@ -25,7 +25,7 @@ DEMO_IMAGE    ?= songs/DEMO.VBM
 NO_IMAGE      ?= 1
 PLAYER_DATA   = demo.vtm.prg $(if $(NO_IMAGE),,demo.vbm.prg)
 
-PRGS = testfx.prg testirq.prg $(TEXT_PRGS) testplr.prg $(PLAYER_DATA) vic_mirror.prg
+PRGS = testfx.prg testirq.prg $(TEXT_PRGS) testplr.prg $(PLAYER_DATA) vic_mirror.prg testmem.prg
 
 .PHONY: all clean
 all: $(PRGS)
@@ -55,6 +55,11 @@ testplr.prg: test_player.c vtm_loader.c vbm_loader.c vtm_player.o vbm_display.o 
 
 vic_mirror.prg: vic_mirror.c $(HEADERS)
 	$(CL65) $(CFLAGS) -o $@ $<
+
+# the card's GeoRAM next to the VERA: always for $DF00, the only base where the card
+# has its GeoRAM (test_mem.c is shared with VERA_ATARI_PBI/vera-tests)
+testmem.prg: test_mem.c
+	$(CL65) -t c64 -O -o $@ $<
 
 vtm_player.o: vtm_notes.inc
 
