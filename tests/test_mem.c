@@ -34,8 +34,9 @@ static volatile unsigned char *page_select(unsigned char b, unsigned char p)
     GEO_PAGE = p;
     return (volatile unsigned char *)0xDE00;
 }
-#define VERA_ON()
-#define VERA_OFF()
+#define CARDSEL   (*(volatile unsigned char *)0xDFFD)  /* VERA select latch */
+#define VERA_ON()      (CARDSEL = 1)                   /* the GeoRAM is always on */
+#define VERA_OFF()     (CARDSEL = 0)
 #define BANKING_BEGIN()
 #define BANKING_END()
 #define SHOW_RESULT(c) (BORDER = (c))
