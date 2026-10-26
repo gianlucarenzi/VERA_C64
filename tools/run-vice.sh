@@ -5,7 +5,7 @@
 #   tools/run-vice.sh tests/testfx.prg      autostart a program
 #
 # VICE:       VICE=x64sc-3.10 (default x64sc; it needs the VERA card, see
-#             https://github.com/gianlucarenzi/vice/tree/vera-io1)
+#             https://github.com/gianlucarenzi/vice, branch main)
 # VERA_BASE:  0xDE00 (IO1, default) or 0xDF00 (IO2)
 # SDCARD:     raw SD card image on the SPI port of the VERA
 # JOYKEYS=1:  the joystick in port 2 on the cursor keys and SPACE (fire),

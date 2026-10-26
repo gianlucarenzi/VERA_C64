@@ -29,7 +29,7 @@ BASIC's `READY.` then appears on the VERA.
 Running the program again, or another of the three, replaces the driver
 already in memory.
 
-In VICE (the build with the VERA card, branch `vera-io1` of
+In VICE (the build with the VERA card, branch `main` of
 https://github.com/gianlucarenzi/vice):
 
     x64sc -vera -autostart vera80.prg

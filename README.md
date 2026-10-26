@@ -21,6 +21,15 @@ The VERA card connects to the C64 expansion port and operates at two possible me
 - `$DE00` (IO1, default)
 - `$DF00` (IO2)
 
+**Select latch at `$DFFD`.** The card (RBL-C64, and its emulation in VICE) answers
+only while the VERA is selected: writing a non-zero value to `$DFFD` selects it,
+writing 0 deselects it, at either base. The latch is cleared at power-on and kept
+across a reset. The GeoRAM of the card is always active, independently of the latch.
+All the programs of this project select the VERA before using it:
+`vera_detect()` / `vera_require()` (`include/vera_detect.h`) in C, the `detect`
+routine in the screen driver; `VERA_SELECT()` / `VERA_DESELECT()` (`include/vera.h`)
+and `VERA_CARDSEL` (`include/vera_common.inc`) are there for your own code.
+
 ## 📦 Project Components
 
 ### 1. Screen Driver (`driver/`)
@@ -58,6 +67,36 @@ Comprehensive test programs for VERA functionality, including:
 - Graphics and palette tests
 - Performance benchmarks
 
+#### Pac-Man (`pacman.prg`)
+
+A simple Pac-Man on the VERA with the graphics and the sounds of the arcade
+(Namco, 1980): the maze, the four ghosts with their arcade targeting
+(scatter/chase, frightened, eyes going home), power pellets, the cherry, lives
+and levels. The 224x288 arcade screen is shown on layer 0, scaled to the 480
+lines of the VGA output; the three voices of the arcade sound chip play on the
+SID. It runs at 60 frames per second on the VSYNC of the VERA.
+
+The arcade ROMs are **not** in the repository. The build converts them from the
+MAME ROM set `pacman` (a file named `pacman.zip`, by default
+`~/Downloads/pacman.zip`):
+- `tests/pacman_gfx.py` - tiles, sprites, palette and maze for the VERA
+- `tests/pacman_rip.lua` - run by MAME: plays a game and logs the sound chip
+  frame by frame (about a minute, needed once: the log is kept)
+- `tests/pacman_snd.py` - turns the log into SID data
+
+Everything generated goes to `tests/gen/` (not committed). `pacman.prg` is built
+only when the ROM set is there, and is left off `vera-c64.d64` (no room, and it
+contains ROM data).
+
+```bash
+make PACMAN_ZIP=/path/to/pacman.zip       # or just make, with ~/Downloads/pacman.zip
+JOYKEYS=1 tools/run-vice.sh tests/pacman.prg
+```
+
+Controls: joystick in port 2, fire to start. In VICE, `JOYKEYS=1` puts the
+joystick on the cursor keys and SPACE (`tools/joy2-keys.vicerc`; not saved to
+`vicerc` on exit).
+
 ### 3. RMT Music Player (`rmt/`)
 
 Full-featured music player for Revenge of the Music Tracker (RMT) files and SAP/XEX exports, with:
@@ -82,7 +121,7 @@ See [rmt/BUILD_GUIDE.md](rmt/BUILD_GUIDE.md) for detailed compilation instructio
 
 ### Prerequisites
 
-- **Emulator**: [VICE](https://vice-emu.sourceforge.io/) with VERA card support (branch `vera-io1`)
+- **Emulator**: [VICE](https://vice-emu.sourceforge.io/) with VERA card support (branch `main` of https://github.com/gianlucarenzi/vice)
 - **Compiler**: [cc65](https://cc65.github.io/) (ca65/ld65)
 - **Tools**: Python 3, c1541 (for D64 disk images)
 
@@ -111,6 +150,9 @@ x64sc -vera vera-c64.d64 &
 # Or with autostart:
 x64sc -vera -autostart driver/vera80.prg &
 x64sc -vera -autostart rmt/rmtplay.prg &
+
+# Pac-Man, with the joystick in port 2 on the cursor keys and SPACE
+JOYKEYS=1 tools/run-vice.sh tests/pacman.prg
 ```
 
 ## 📚 Documentation
@@ -166,6 +208,11 @@ VERA_C64/
 │
 ├── tests/                                       # Test Suite
 │   ├── vic_mirror.c                            # VIC-II mirroring example
+│   ├── test_pacman.c                           # Pac-Man (pacman.prg)
+│   ├── pacman_gfx.py                           # arcade graphics → VERA
+│   ├── pacman_rip.lua                          # MAME script: rips the arcade sounds
+│   ├── pacman_snd.py                           # ripped sounds → SID data
+│   ├── gen/                                    # Generated from the ROMs (not committed)
 │   └── [Various other test programs]
 │
 ├── include/                                     # C/ASM Headers
@@ -174,7 +221,8 @@ VERA_C64/
 │   └── vera_common.inc                         # Assembly constants
 │
 ├── tools/                                       # Project Tools
-│   └── run-vice.sh                             # VICE launcher script
+│   ├── run-vice.sh                             # VICE launcher script
+│   └── joy2-keys.vicerc                        # joystick 2 on the keyboard (JOYKEYS=1)
 │
 ├── vera-c64.d64                                # Compiled disk image
 └── Documentation/                              # Technical references
@@ -251,11 +299,13 @@ x64sc -vera -autostart driver/vera80.prg &
 
 ### Requirements
 
-- **VICE** with VERA support (`vera-io1` branch)
+- **VICE** with VERA support (`main` branch)
   ```bash
-  git clone https://github.com/gianlucarenzi/vice.git -b vera-io1
+  git clone https://github.com/gianlucarenzi/vice.git
   # Compile and install VICE
   ```
+
+- **MAME** (optional) - only for Pac-Man, to rip the arcade sounds once
 
 - **CC65** compiler suite
   ```bash
@@ -309,6 +359,7 @@ $E000-$FFFF  - Kernal ROM
 **VERA VRAM:**
 ```
 $00000-$00FFF  - Reserved
+$00000-$05FFF  - Pac-Man: map, tiles, sprites (pacman.prg)
 $01000-$01FFF  - RMT player font (rmtplay.prg)
 $1B000-$1EFFF  - Screen driver tilemap (vera80/60/40.prg)
 $1F000-$1FFFF  - Screen driver font
@@ -322,6 +373,8 @@ The VERA card is not detected. Possible causes:
 - VICE not launched with `-vera` flag
 - Wrong VERA address (try `VERA_BASE=0xDF00`)
 - VERA not supported in VICE build
+- Your own program does not select the VERA through the latch: write 1 to
+  `$DFFD` first (`VERA_SELECT()`, or call `vera_detect()`)
 
 **Solution:**
 ```bash
@@ -367,6 +420,8 @@ See [LICENSE](LICENSE) file for details.
 - **PETSCII Font**: Public domain from Commander X16 ROM
 - **RMT Player**: Based on Atari RMT engine
 - **VERA Card Design**: From Commander X16 project
+- **Pac-Man**: graphics and sounds © Namco 1980; not included, converted at build
+  time from your own copy of the arcade ROMs
 
 ## 🤝 Contributing
 
