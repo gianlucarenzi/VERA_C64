@@ -13,6 +13,12 @@
 VERA_BASE               = $DE00                     ; IO1 (VICE: -vera -verabase 0xde00)
 .endif
 
+; The select latch of the card (RBL-C64, and VICE): write != 0 selects the
+; VERA, 0 deselects it; its registers answer only while it is selected, at
+; either base.  Cleared at power-on, kept across a reset.  The GeoRAM of the
+; card is always active.
+VERA_CARDSEL            = $DFFD                     ; write: 1 select, 0 deselect
+
 ; ============================================================================
 ; VERA registers (at VERA_BASE + offset)
 ; ============================================================================

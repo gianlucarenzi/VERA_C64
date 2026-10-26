@@ -14,6 +14,14 @@
 
 #define VERA_REG(n)     (*(volatile unsigned char *)(VERA_BASE + (n)))
 
+/* The select latch of the card (RBL-C64, and VICE): write != 0 to $DFFD
+ * selects the VERA, 0 deselects it; its registers answer only while it is
+ * selected, at either base.  Cleared at power-on, kept across a reset.  The
+ * GeoRAM of the card is always active.  vera_detect() selects the VERA. */
+#define VERA_CARDSEL    (*(volatile unsigned char *)0xDFFD)
+#define VERA_SELECT()   (VERA_CARDSEL = 1)
+#define VERA_DESELECT() (VERA_CARDSEL = 0)
+
 #define VERA_ADDR_L     VERA_REG(0x00)
 #define VERA_ADDR_M     VERA_REG(0x01)
 #define VERA_ADDR_H     VERA_REG(0x02)

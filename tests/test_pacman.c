@@ -34,7 +34,6 @@
 #include "gen/pacgfx.h"
 #include "gen/pacsnd.h"
 
-#define CARDSEL (*(volatile unsigned char *)0xDFFD)  /* VERA select latch (RBL-C64 card, VICE) */
 #define JOY2    (*(volatile unsigned char *)0xDC00)
 #define SIDREG  ((volatile unsigned char *)0xD400)
 
@@ -1003,9 +1002,8 @@ int main(void)
 {
     unsigned char i;
 
-    CARDSEL = 1;                            /* select the VERA (the latch of the card) */
     clrscr();
-    vera_require();
+    vera_require();                         /* also selects the VERA ($DFFD) */
     cputs("pac-man on the vera\r\n\r\n"
           "graphics and sounds of the arcade\r\n"
           "(c) namco 1980\r\n\r\n"

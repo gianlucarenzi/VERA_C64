@@ -182,8 +182,11 @@ signature_text:
         .byte   "VERA"
 
 ; detect — C clear when the VERA answers: DCSEL 63 reads 'V' and the major
-; version of a VERA with FX
+; version of a VERA with FX.  The VERA is selected first through the latch
+; $DFFD, and stays selected.
 detect:
+        lda     #1
+        sta     VERA_CARDSEL
         lda     #VERA_DCSEL63
         sta     VERA_CTRL
         lda     VERA_BASE+$09
