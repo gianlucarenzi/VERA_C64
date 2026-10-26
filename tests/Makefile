@@ -25,7 +25,18 @@ DEMO_IMAGE    ?= songs/DEMO.VBM
 NO_IMAGE      ?= 1
 PLAYER_DATA   = demo.vtm.prg $(if $(NO_IMAGE),,demo.vbm.prg)
 
-PRGS = testfx.prg testirq.prg $(TEXT_PRGS) testplr.prg $(PLAYER_DATA) vic_mirror.prg testmem.prg
+# Pac-Man (test_pacman.c) with the graphics and the sounds of the arcade, from
+# the MAME ROM set "pacman" (not in the repository): built only when
+# PACMAN_ZIP is there.  The sounds are ripped by running the game in MAME
+# (pacman_rip.lua, about a minute); gen/pacman_rip.log is kept, so MAME is
+# needed only once.  pacman.prg stays off the D64 (no room, and the ROM data
+# is not ours to hand out).  Joystick in port 2; in VICE also on the cursor
+# keys and SPACE: JOYKEYS=1 tools/run-vice.sh tests/pacman.prg
+PACMAN_ZIP ?= $(HOME)/Downloads/pacman.zip
+MAME       ?= mame
+PACMAN     = $(and $(wildcard $(PACMAN_ZIP)),$(or $(wildcard gen/pacman_rip.log),$(shell command -v $(MAME))),pacman.prg)
+
+PRGS = testfx.prg testirq.prg $(TEXT_PRGS) testplr.prg $(PLAYER_DATA) vic_mirror.prg testmem.prg $(PACMAN)
 
 .PHONY: all clean
 all: $(PRGS)
@@ -69,5 +80,23 @@ demo.vtm.prg: $(DEMO_SONG_SRC) tools/vtm_compile.py
 demo.vbm.prg: $(DEMO_IMAGE)
 	cp $< $@
 
+pacman.prg: test_pacman.c gen/pacgfx.s gen/pacgfx.h gen/pacsnd.s gen/pacsnd.h $(HEADERS)
+	$(CL65) $(CFLAGS) -Oirs -o $@ test_pacman.c gen/pacgfx.s gen/pacsnd.s
+
+gen/pacgfx.s: pacman_gfx.py $(PACMAN_ZIP)
+	mkdir -p gen
+	$(PYTHON) pacman_gfx.py $(PACMAN_ZIP) $@ gen/pacgfx.h
+gen/pacgfx.h: gen/pacgfx.s ;
+
+# MAME looks for the set by name: PACMAN_ZIP must be called pacman.zip
+gen/pacman_rip.log: pacman_rip.lua $(PACMAN_ZIP)
+	mkdir -p gen
+	PACRIP_OUT=$@ $(MAME) pacman -rompath $(dir $(PACMAN_ZIP)) -video none -sound none \
+	    -nothrottle -skip_gameinfo -seconds_to_run 120 -autoboot_script pacman_rip.lua
+
+gen/pacsnd.s: pacman_snd.py gen/pacman_rip.log
+	$(PYTHON) pacman_snd.py gen/pacman_rip.log $@ gen/pacsnd.h
+gen/pacsnd.h: gen/pacsnd.s ;
+
 clean:
-	rm -f *.prg *.o *.map
+	rm -f *.prg *.o *.map gen/pacgfx.* gen/pacsnd.*

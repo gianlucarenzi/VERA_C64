@@ -24,11 +24,11 @@ $(SUBDIRS):
 	$(MAKE) -C $@
 
 # every PRG of the subdirectories, under its own name (lower case: PETSCII
-# upper case on the C64 screen)
+# upper case on the C64 screen); not tests/pacman.prg, made of the arcade ROMs
 $(D64): $(SUBDIRS)
 	rm -f $@
 	$(C1541) -format "$(D64_NAME)" d64 $@ \
-	    $(foreach p,$(sort $(wildcard $(addsuffix /*.prg,$(SUBDIRS)))),-write $(p) $(basename $(notdir $(p)))) > /dev/null
+	    $(foreach p,$(filter-out tests/pacman.prg,$(sort $(wildcard $(addsuffix /*.prg,$(SUBDIRS))))),-write $(p) $(basename $(notdir $(p)))) > /dev/null
 	$(C1541) -attach $@ -list
 
 run: $(D64)

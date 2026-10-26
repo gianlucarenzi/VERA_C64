@@ -6,3 +6,7 @@
 *.d64
 /rmt/gen/
 /driver/gen/
+# converted from the Pac-Man arcade ROMs: not to be committed
+/tests/gen/
+# written by MAME while pacman_rip.lua runs
+/tests/history/
