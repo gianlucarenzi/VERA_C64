@@ -20,7 +20,7 @@
 ;
 ; The VIC-II screen is left alone: it keeps what it showed at install time.
 ;
-; Build: ca65 -D VERA_BASE=$DE00 [-D FONT_8X8=1] [-D MODE_40X30=1 -D FONT_8X8=1]
+; Build: ca65 -D VERA_BASE=$DF00 [-D FONT_8X8=1] [-D MODE_40X30=1 -D FONT_8X8=1]
 
         .setcpu "6502"
 

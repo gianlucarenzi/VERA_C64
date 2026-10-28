@@ -1,12 +1,12 @@
-# Makefile - VERA test programs for the C64 (card at VERA_BASE, $DE00 by
-# default; VERA_BASE=0xDF00 for IO2).
+# Makefile - VERA test programs for the C64 (the card at $DF00, IO2: IO1 is
+# the GeoRAM window of the card).
 
 CL65      = cl65
 CA65      = ca65
 LD65      = ld65
 C1541    ?= c1541
 PYTHON   ?= python3
-VERA_BASE ?= 0xDE00
+VERA_BASE ?= 0xDF00
 
 INC       = ../include
 CFLAGS    = -t c64 -O -I $(INC) -DVERA_BASE=$(VERA_BASE)u

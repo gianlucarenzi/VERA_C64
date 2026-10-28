@@ -2,7 +2,6 @@
 # RMT player, collected on a D64 disk image.
 #
 #   make                  build everything and vera-c64.d64
-#   make VERA_BASE=0xDF00 the card in IO2 instead of IO1
 #   make NO_IMAGE=        also tests/demo.vbm.prg (does not fit on the D64)
 #   make run              start VICE with the card and the disk
 #   make clean
@@ -13,7 +12,8 @@ D64_NAME  = vera c64,vc
 C1541    ?= c1541
 VICE     ?= x64sc
 
-VERA_BASE ?= 0xDE00
+# the VERA always at $DF00 (IO2): IO1 is the GeoRAM window of the card
+VERA_BASE ?= 0xDF00
 export VERA_BASE
 
 .PHONY: all clean run $(SUBDIRS)

@@ -224,7 +224,7 @@ cd tests
 make vic_mirror.prg
 
 # Run on VICE
-x64sc -vera -autostart vic_mirror.prg &
+x64sc -vera -verabase 0xdf00 -autostart vic_mirror.prg &
 ```
 
 **Features:**

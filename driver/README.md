@@ -16,7 +16,7 @@ card.
     LOAD"VERA80",8
     RUN
 
-The program prints `VERA NOT FOUND AT $DE00` when the card does not answer
+The program prints `VERA NOT FOUND AT $DF00` when the card does not answer
 (the identity bytes of DCSEL 63 are checked). Otherwise it:
 
 1. copies the resident part to `$C000`;
@@ -32,12 +32,11 @@ already in memory.
 In VICE (the build with the VERA card, branch `main` of
 https://github.com/gianlucarenzi/vice):
 
-    x64sc -vera -autostart vera80.prg
+    x64sc -vera -verabase 0xdf00 -autostart vera80.prg
 
 ## Build
 
-    make                    # card at $DE00 (IO1)
-    make VERA_BASE=0xDF00   # card at $DF00 (IO2)
+    make                    # the card at $DF00 (IO2; IO1 is its GeoRAM window)
 
 The tools needed are `ca65`/`ld65` (cc65) and `python3`. `mkfont.py`
 builds the fonts in `gen/`.

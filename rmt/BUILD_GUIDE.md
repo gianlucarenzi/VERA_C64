@@ -188,7 +188,7 @@ which x64sc
 make run
 
 # With specific song
-x64sc -vera -autostart testrmt.prg &
+x64sc -vera -verabase 0xdf00 -autostart testrmt.prg &
 
 # With saved configuration
 x64sc -config ~/.config/vice/vicerc-3.10 -vera -autostart rmtplay.prg &
@@ -206,16 +206,10 @@ tools/run-vice.sh vera-c64.d64
 
 ## Advanced Options
 
-### Select VERA Card Location
+### VERA Card Location
 
-The VERA card can be at two addresses:
-- `0xDE00` (IO1, default)
-- `0xDF00` (IO2)
-
-```bash
-make                        # Compile for $DE00
-make VERA_BASE=0xDF00       # Compile for $DF00
-```
+The VERA card is always at `$DF00` (IO2): IO1 (`$DE00`-`$DEFF`) is the window of
+the GeoRAM of the card. VICE: `x64sc -vera -verabase 0xdf00`.
 
 ### Select Display
 
@@ -250,7 +244,7 @@ make RMT_SONG=music/turrican2_rev2s.rmt testrmt.prg
 
 Launch on VICE:
 ```bash
-x64sc -vera -autostart testrmt.prg &
+x64sc -vera -verabase 0xdf00 -autostart testrmt.prg &
 ```
 
 ### Example 2: Full player with Final Fantasy
@@ -329,7 +323,7 @@ The program cannot find the VERA card. Possible causes:
 **Solution:**
 ```bash
 # Make sure to use -vera
-x64sc -vera -autostart testrmt.prg &
+x64sc -vera -verabase 0xdf00 -autostart testrmt.prg &
 
 # Or compile for the other address
 make VERA_BASE=0xDF00 clean
@@ -388,7 +382,7 @@ cd rmt && make
 cd rmt && make RMT_SONG=music/turrican2_rev2s.rmt testrmt.prg
 
 # Run test on VICE
-x64sc -vera -autostart rmt/testrmt.prg &
+x64sc -vera -verabase 0xdf00 -autostart rmt/testrmt.prg &
 
 # Check symbol map (addresses)
 cat rmt/gen/testrmt.map | head -20
@@ -412,16 +406,16 @@ cd rmt && make clean
 cd rmt && make
 
 # 2. Run on VICE
-x64sc -vera -autostart rmtplay.prg &
+x64sc -vera -verabase 0xdf00 -autostart rmtplay.prg &
 
 # 3. Build with Turrican 2 and test
 make RMT_SONG=music/turrican2_rev2s.rmt testrmt.prg
-x64sc -vera -autostart testrmt.prg &
+x64sc -vera -verabase 0xdf00 -autostart testrmt.prg &
 
 # 4. Try different song with metadata
 make RMT_SONG=music/Final_Fantasy.sap RMT_SUBSONG=0 \
      RMT_NAME="Final Fantasy" RMT_AUTHOR="Nobuo Uematsu" rmtplay.prg
-x64sc -vera -autostart rmtplay.prg &
+x64sc -vera -verabase 0xdf00 -autostart rmtplay.prg &
 ```
 
 ---

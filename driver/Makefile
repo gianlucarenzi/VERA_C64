@@ -4,14 +4,14 @@
 #   vera60.prg  80x60, 8x8 font
 #   vera40.prg  40x30, 8x8 font scaled 2x (320x240)
 #
-#   make [VERA_BASE=0xDE00|0xDF00]
+#   make                  the card at $DF00 (IO2: IO1 is its GeoRAM window)
 
 CA65      = ca65
 LD65      = ld65
 PYTHON   ?= python3
-VERA_BASE ?= 0xDE00
+VERA_BASE ?= 0xDF00
 
-# ca65 wants $DE00, make passes 0xDE00
+# ca65 wants $DF00, make passes 0xDF00
 BASE_ASM  = '$$$(patsubst 0x%,%,$(patsubst 0X%,%,$(VERA_BASE)))'
 ASFLAGS   = --cpu 6502 -I ../include -I . -D VERA_BASE=$(BASE_ASM)
 

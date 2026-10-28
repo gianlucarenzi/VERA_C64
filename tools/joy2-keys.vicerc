@@ -3,7 +3,7 @@
 # keys then no longer reach the C64 keyboard.
 #
 #   JOYKEYS=1 tools/run-vice.sh tests/pacman.prg
-#   x64sc -vera -addconfig tools/joy2-keys.vicerc +saveres ...
+#   x64sc -vera -verabase 0xdf00 -addconfig tools/joy2-keys.vicerc +saveres ...
 #
 # +saveres: with SaveResourcesOnExit=1 VICE would write these keys into
 # vicerc on exit, and they would stay a joystick in every session.

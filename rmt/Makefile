@@ -22,8 +22,9 @@ PYTHON   ?= python3
 GEN      = gen
 INC      = ../include
 
-VERA_BASE ?= 0xDE00
-# ca65 takes $DE00, cc65 0xDE00
+# the VERA always at $DF00 (IO2): IO1 is the GeoRAM window of the card
+VERA_BASE ?= 0xDF00
+# ca65 takes $DF00, cc65 0xDF00
 VERA_BASE_ASM = $$$(patsubst 0x%,%,$(patsubst 0X%,%,$(VERA_BASE)))
 
 RMT_SONG    ?= music/gemx.rmt

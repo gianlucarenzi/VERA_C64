@@ -17,9 +17,11 @@ VERA is an expansion card for the Commodore 64 that adds:
 - **Audio**: PSG (Programmable Sound Generator) with 16 voices
 - **Memory**: 128KB of dedicated VRAM
 
-The VERA card connects to the C64 expansion port and operates at two possible memory addresses:
-- `$DE00` (IO1, default)
-- `$DF00` (IO2)
+The VERA card connects to the C64 expansion port. Its 32 registers are always at
+**`$DF00`** (IO2): IO1 (`$DE00`-`$DEFF`) is the window of the GeoRAM of the card
+(RBL-C64), with its page and block registers at `$DFFE`/`$DFFF`. Every program of
+this project (screen driver, tests, Pac-Man, RMT player) uses the VERA at `$DF00`
+and never touches the GeoRAM but `test_mem.c`, which tests it.
 
 **Select latch at `$DFFD`.** The card (RBL-C64, and its emulation in VICE) answers
 only while the VERA is selected: writing a non-zero value to `$DFFD` selects it,
@@ -161,9 +163,6 @@ See [rmt/BUILD_GUIDE.md](rmt/BUILD_GUIDE.md) for detailed compilation instructio
 # Compile all components and create vera-c64.d64 disk image
 make
 
-# Or compile for VERA at $DF00 instead of $DE00
-make VERA_BASE=0xDF00
-
 # Clean all generated files
 make clean
 ```
@@ -175,11 +174,11 @@ make clean
 make run
 
 # Or manually:
-x64sc -vera vera-c64.d64 &
+x64sc -vera -verabase 0xdf00 vera-c64.d64 &
 
 # Or with autostart:
-x64sc -vera -autostart driver/vera80.prg &
-x64sc -vera -autostart rmt/rmtplay.prg &
+x64sc -vera -verabase 0xdf00 -autostart driver/vera80.prg &
+x64sc -vera -verabase 0xdf00 -autostart rmt/rmtplay.prg &
 
 # Pac-Man (disk with the loader), with the joystick in port 2 on the cursor keys and SPACE
 JOYKEYS=1 tools/run-vice.sh tests/pacman.d64
@@ -296,7 +295,7 @@ cd tests && make
 ### Run the Screen Driver
 
 ```bash
-x64sc -vera -autostart driver/vera80.prg &
+x64sc -vera -verabase 0xdf00 -autostart driver/vera80.prg &
 # Then load and run BASIC programs:
 # LOAD"PROGRAM",8
 # RUN
@@ -307,7 +306,7 @@ x64sc -vera -autostart driver/vera80.prg &
 ```bash
 cd rmt
 make RMT_SONG=music/turrican2_rev2s.rmt rmtplay.prg
-x64sc -vera -autostart rmtplay.prg &
+x64sc -vera -verabase 0xdf00 -autostart rmtplay.prg &
 ```
 
 ### Create a Custom Player with Metadata
@@ -326,7 +325,7 @@ make RMT_SONG=music/Final_Fantasy.sap RMT_SUBSONG=0 \
 ```bash
 make VERA_BASE=0xDF00 clean
 make VERA_BASE=0xDF00
-x64sc -vera -autostart driver/vera80.prg &
+x64sc -vera -verabase 0xdf00 -autostart driver/vera80.prg &
 ```
 
 ## 🛠️ Development
@@ -360,13 +359,10 @@ x64sc -vera -autostart driver/vera80.prg &
 
 ### Project Configuration
 
-**VERA Base Address:**
-- Default: `$DE00` (IO1)
-- Alternate: `$DF00` (IO2)
+**VERA Base Address:** always `$DF00` (IO2); `$DE00` (IO1) is the GeoRAM window
+of the card. VICE runs with `-vera -verabase 0xdf00` (`tools/run-vice.sh` does it).
 
-Set via environment variable:
 ```bash
-export VERA_BASE=0xDF00
 make clean && make
 ```
 
@@ -413,7 +409,7 @@ The VERA card is not detected. Possible causes:
 **Solution:**
 ```bash
 # Ensure -vera is used
-x64sc -vera -autostart program.prg &
+x64sc -vera -verabase 0xdf00 -autostart program.prg &
 
 # Or rebuild for the correct address
 make VERA_BASE=0xDF00 clean && make VERA_BASE=0xDF00

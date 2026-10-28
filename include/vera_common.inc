@@ -2,15 +2,16 @@
 ; shared by the screen driver, the tests and the RMT player.
 ; All symbol names are padded to 24 characters so the '=' falls at column 25.
 ;
-; The card decodes A0-A4 and /IO1 (or /IO2): its 32 registers are at $DE00
-; (images up to $DEFF), or at $DF00 when assembled with -D VERA_BASE=$DF00.
+; The card decodes A0-A4 and /IO2: its 32 registers are at $DF00.  /IO1
+; ($DE00-$DEFF) is the window of the GeoRAM of the card (RBL-C64), its page
+; and block registers at $DFFE/$DFFF: never touched here.
 
 ; ============================================================================
 ; Expansion port interface
 ; ============================================================================
 
 .ifndef VERA_BASE
-VERA_BASE               = $DE00                     ; IO1 (VICE: -vera -verabase 0xde00)
+VERA_BASE               = $DF00                     ; IO2 (VICE: -vera -verabase 0xdf00)
 .endif
 
 ; The select latch of the card (RBL-C64, and VICE): write != 0 selects the

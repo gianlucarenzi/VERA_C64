@@ -13,12 +13,12 @@
 #define VERA_CARD_ID  ((unsigned int)0x5658)
 
 /*
- * vera_detect() - probe the VERA card at VERA_BASE ($DE00).
+ * vera_detect() - probe the VERA card at VERA_BASE ($DF00).
  *
  * Selects the VERA through the latch $DFFD first (it stays selected), then
  * DCSEL=63 (CTRL=$7E) and checks the identity bytes: $09 = 'V',
  * $0A = major version >= 47 (the FX firmware generation: 47.0.2 reads
- * 'V',47,0,0, 48.0.1 reads 'V',48,0,1).  An open bus in IO1 reads what the
+ * 'V',47,0,0, 48.0.1 reads 'V',48,0,1).  An open bus in IO2 reads what the
  * VIC-II fetched last, so a write/read-back probe is not enough; the
  * identity bytes are.  CTRL is restored to 0 afterwards.
  *
@@ -55,7 +55,7 @@ static unsigned int vera_require(void)
     unsigned int id = vera_detect();
     if (!id) {
         printf("error: vera card not found at $%04x.\n", (unsigned int)VERA_BASE);
-        printf("vice: x64sc -vera\n");
+        printf("vice: x64sc -vera -verabase 0xdf00\n");
         exit(1);
     }
     return id;

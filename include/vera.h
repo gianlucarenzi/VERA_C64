@@ -1,15 +1,16 @@
 /*
  * vera.h - the registers of the VERA card on the C64 expansion port.
  *
- * The card decodes A0-A4 and /IO1 (or /IO2): its 32 registers are at $DE00,
- * or at $DF00 when built with -DVERA_BASE=0xDF00 (see vera_common.inc).
+ * The card decodes A0-A4 and /IO2: its 32 registers are at $DF00.  /IO1
+ * ($DE00-$DEFF) is the window of the GeoRAM of the card (RBL-C64), its page
+ * and block registers at $DFFE/$DFFF (see vera_common.inc).
  */
 
 #ifndef VERA_H
 #define VERA_H
 
 #ifndef VERA_BASE
-#define VERA_BASE 0xDE00u
+#define VERA_BASE 0xDF00u
 #endif
 
 #define VERA_REG(n)     (*(volatile unsigned char *)(VERA_BASE + (n)))
