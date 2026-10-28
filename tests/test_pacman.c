@@ -3,8 +3,10 @@
  *
  * The ROMs are not in the repository: pacman_gfx.py converts the graphics of
  * the MAME set "pacman" (PACMAN_ZIP in the Makefile) and pacman_snd.py the
- * sounds, ripped by running the game in MAME with pacman_rip.lua; both write
- * to gen/.
+ * sounds, ripped by running the game in MAME with pacman_rip.lua; the attract
+ * mode and the three intermissions are recorded in MAME frame by frame by
+ * pacman_scenes.lua and played back from the streams of pacman_scene.py.  All
+ * of them write to gen/.
  *
  * Picture: the 224x288 screen of the rotated arcade monitor on layer 0 (the
  * 256 tiles, 2 bpp, map 32x64 of which 28x36 are used), scaled by 128/77 to
@@ -14,17 +16,21 @@
  * tile or sprite of the arcade is a palette offset (pacgfx.h).
  *
  * Sound: the 3 voices of the Namco WSG on the 3 SID voices, frame by frame
- * (pacsnd.h): voice 0 the intro and the extra life, voice 1 the intro and
- * the siren / frightened ghosts / eyes, voice 2 dots, fruit, ghost eaten and
- * the death.
+ * (pacsnd.h): voice 0 the intro, the intermission song and the extra life,
+ * voice 1 the intro, the intermission song and the siren / frightened ghosts
+ * / eyes, voice 2 dots, fruit, ghost eaten and the death.
+ *
+ * The levels as on the arcade: the fruit of every level and its points, the
+ * speeds of Pac-Man and of the ghosts, the time the ghosts stay frightened
+ * and their flashes, the scatter / chase periods, Blinky's "Elroy" speed-ups,
+ * the dot counters of the ghost house; the intermissions after the levels 2,
+ * 5, 9, 13 and 17; the fruits of the last 7 levels at the bottom right.
  *
  * Joystick in port 2; fire starts a game.  The game runs at the VSYNC of the
  * VERA (60 Hz), with the IRQs of the C64 off.
  *
- * Simpler than the arcade: no cornering, no "Elroy" speed-up, no
- * intermissions, the cherry as the only fruit, ghosts leave the house by dot
- * counts and an idle timer only, the eyes of an eaten ghost do not move while
- * its score is shown.
+ * Simpler than the arcade: no cornering, the eyes of an eaten ghost do not
+ * move while its score is shown, no split screen at level 256.
  */
 
 #include <conio.h>
@@ -33,6 +39,7 @@
 #include "detect.h"
 #include "gen/pacgfx.h"
 #include "gen/pacsnd.h"
+#include "gen/pacscn.h"
 
 #define JOY2   (*(volatile unsigned char *)0xDC00)
 #define SIDREG ((volatile unsigned char *)0xD400)
@@ -49,21 +56,19 @@
 #define T_DOOR1 0xCE
 #define T_DOOR2 0xCF
 
+#define T_LIFE  0x20 /* 2x2: Pac-Man at the bottom left */
+#define T_FRUIT 0x90 /* 2x2 each, + sprite code * 4 */
+
 /* sprite codes of the arcade */
-#define S_CHERRY 0
 #define S_FRIGHT 28 /* + frame */
 #define S_GHOST  32 /* + direction * 2 + frame */
 #define S_SCORE  40 /* 200, 400, 800, 1600 */
 #define S_PAC_C  48 /* closed; 44/46 open right, 45/47 open down */
 #define S_DEATH  52 /* 12 frames */
 
-/* sprite slots of the VERA */
-#define SP_GHOST 0 /* 4 ghosts */
-#define SP_PAC   4
-#define SP_FRUIT 5
-#define SP_LIVES 6 /* 3 */
-#define SP_LEVEL 9
-#define SP_COUNT 10
+/* sprite slots of the VERA: the ghosts 0-3, Pac-Man 4, the fruit 5; the
+ * scenes use 0-7, the 8 sprites of the arcade */
+#define SP_SCENE 8
 
 #define RIGHT 0 /* the order of the ghost sprites */
 #define DOWN  1
@@ -84,14 +89,11 @@
 #define DOOR_Y  92  /* row 14, above the door */
 #define FRUIT_Y 140 /* row 20 */
 
-/* speeds in 1/64 pixel per frame */
-#define SP_PAC_N   64
-#define SP_PAC_F   72
-#define SP_GHOST_N 60
-#define SP_GHOST_F 40
-#define SP_TUNNEL  32
-#define SP_EYES    128
-#define SP_HOUSE   32
+#define POINTS_X 12 /* the points of the fruit: 4 tiles */
+
+/* speeds in 1/64 pixel per frame, 80 = 100% (75.76 pixels per second) */
+#define SP_EYES  128
+#define SP_HOUSE 32
 
 /* ghost states */
 #define G_HOUSE    0
@@ -107,6 +109,7 @@
 #define PH_DYING    3
 #define PH_LEVEL    4
 #define PH_GAMEOVER 5
+#define PH_SCENE    6 /* the attract mode or an intermission */
 
 static const signed char dx[4] = { 1, 0, -1, 0 };
 static const signed char dy[4] = { 0, 1, 0, -1 };
@@ -115,10 +118,37 @@ static const signed char dy[4] = { 0, 1, 0, -1 };
 static const signed char corner_x[4] = { 25, 2, 27, 0 };
 static const signed char corner_y[4] = { 0, 0, 35, 35 };
 static const unsigned char ghost_x0[4] = { 112, 112, 96, 128 };
-static const unsigned char house_dots[4] = { 0, 0, 30, 60 };
 
-/* scatter / chase periods in frames, the last chase forever */
-static const unsigned int mode_frames[8] = { 420, 1200, 420, 1200, 300, 1200, 300, 0 };
+/* The levels of the arcade ("The Pac-Man Dossier").  Speeds for the levels
+ * 1, 2-4, 5-20, 21 and on: */
+static const unsigned char spd_pac_n[4] = { 64, 72, 80, 72 };
+static const unsigned char spd_pac_f[4] = { 72, 76, 80, 72 }; /* while frightened */
+static const unsigned char spd_ghost[4] = { 60, 68, 76, 76 };
+static const unsigned char spd_fright[4] = { 40, 44, 48, 48 };
+static const unsigned char spd_tunnel[4] = { 32, 36, 40, 40 };
+static const unsigned char spd_elroy1[4] = { 64, 72, 80, 80 };
+static const unsigned char spd_elroy2[4] = { 68, 76, 84, 84 };
+
+/* levels 1-19, then as 19: seconds the ghosts stay frightened, their flashes
+ * at the end, the dots left when Blinky becomes Elroy 1 (Elroy 2 at half) */
+static const unsigned char fright_secs[19] = { 6, 5, 4, 3, 2, 5, 2, 2, 1, 5, 2, 1, 1, 3, 1, 1, 0, 1, 0 };
+static const unsigned char fright_flashes[19] = { 5, 5, 5, 5, 5, 5, 5, 5, 3, 5, 5, 3, 3, 5, 3, 3, 0, 3, 0 };
+static const unsigned char elroy_dots[19] = {
+    20, 30, 40, 40, 40, 50, 50, 50, 60, 60, 60, 80, 80, 80, 100, 100, 100, 100, 120
+};
+
+/* scatter / chase periods in frames for the levels 1, 2-4, 5 and on, the
+ * last chase forever */
+static const unsigned int mode_frames[3][8] = {
+    { 420, 1200, 420, 1200, 300, 1200, 300, 0 },
+    { 420, 1200, 420, 1200, 300, 61980u, 1, 0 },
+    { 300, 1200, 300, 1200, 300, 62220u, 1, 0 },
+};
+
+/* dots each ghost waits for in the house, levels 1, 2, 3 and on; after a
+ * life is lost one counter for all: 7, 17, 32 */
+static const unsigned char house_dots[3][4] = { { 0, 0, 30, 60 }, { 0, 0, 0, 50 }, { 0, 0, 0, 0 } };
+static const unsigned char global_dots_at[4] = { 0, 7, 17, 32 };
 
 static unsigned char maze[36 * 28];
 static unsigned char *mrow[36];
@@ -130,16 +160,24 @@ static unsigned int phase_t;
 static unsigned char level, lives, extra_given;
 /* the scores as 7 decimal digits, the most significant first */
 static unsigned char score_d[7], hi_d[7];
-static unsigned char dots, life_dots, idle;
+static unsigned char dots, idle;
 static unsigned int fruit_left;
+static unsigned char points_t; /* the points of the fruit shown */
 
-static unsigned char px, py, pdir, pwant, pacc, panim, pmoving, pac_hidden;
+/* the level: its row of the tables above */
+static unsigned char lv_spd, lv_modes, lv_house, lv_fruit, lv_idle, lv_flash;
+static unsigned int lv_fright;
+static unsigned char elroy1_left, elroy2_left, elroy_off;
+static unsigned char dot_cnt[4], global_dots, use_global;
+
+static unsigned char px, py, pdir, pwant, pacc, panim, pmoving, pac_hidden, pac_stall;
 static unsigned char gx[4], gy[4], gdir[4], gacc[4], gstate[4], gfright[4];
 static signed char tgx, tgy;
 static unsigned int fright_t, mode_t;
 static unsigned char mode_i, ghosts_eaten, score_ghost;
 static unsigned char freeze;
 static unsigned char anim;
+static unsigned char hud_dirty, in_game;
 
 /* ------------------------------------------------------------------ */
 /* VERA                                                                 */
@@ -182,6 +220,18 @@ static void put_text(unsigned char tx, unsigned char ty, const char *s, unsigned
     }
 }
 
+/* n tile codes of the arcade in a row */
+static void put_tiles(unsigned char tx, unsigned char ty, const unsigned char *t,
+                      unsigned char n, unsigned char pal)
+{
+    vram_at(VRAM_MAP + ((unsigned int)ty << 6) + (tx << 1), 0);
+    while (n--)
+    {
+        VERA_DATA0 = *t++;
+        VERA_DATA0 = pal << 4;
+    }
+}
+
 /* the tiles of the maze again where a text was */
 static void clear_text(unsigned char tx, unsigned char ty, unsigned char n)
 {
@@ -209,11 +259,12 @@ static void put_digits(unsigned char right, unsigned char ty, const unsigned cha
     }
 }
 
+/* the maze area, rows 2-33: the scores and the bottom rows stay */
 static void draw_maze(void)
 {
     unsigned char x, y, c;
 
-    for (y = 0; y < 36; ++y)
+    for (y = 2; y < 34; ++y)
     {
         vram_at(VRAM_MAP + ((unsigned int)y << 6), 0);
         for (x = 0; x < 32; ++x)
@@ -308,14 +359,16 @@ static void video_init(void)
 /* ------------------------------------------------------------------ */
 
 static unsigned char sv_clip[3] = { 0xFF, 0xFF, 0xFF };
-static unsigned char sv_left[3], sv_vol[3], sv_wave[3];
+static unsigned char sv_vol[3], sv_wave[3];
+static unsigned int sv_left[3];
 static const unsigned char *sv_cur[3];
+static unsigned char music_off_t; /* the song stops in so many frames */
 
 static void snd_play(unsigned char v, unsigned char clip)
 {
     sv_clip[v] = clip;
     sv_cur[v] = (const unsigned char *)(snd_ptr_lo[clip] | (snd_ptr_hi[clip] << 8));
-    sv_left[v] = snd_len[clip];
+    sv_left[v] = snd_len[clip] | (snd_len_hi[clip] << 8);
 }
 
 static void snd_stop(unsigned char v)
@@ -330,6 +383,22 @@ static void snd_stop_all(void)
     snd_stop(0);
     snd_stop(1);
     snd_stop(2);
+    music_off_t = 0;
+}
+
+/* the intermission song on voices 0 and 1 */
+static void music_play(void)
+{
+    snd_play(0, SND_INTER0);
+    snd_play(1, SND_INTER1);
+    music_off_t = 0;
+}
+
+static void music_stop(void)
+{
+    snd_stop(0);
+    snd_stop(1);
+    music_off_t = 0;
 }
 
 /* voice 1: a continuous sound, started only when it changes */
@@ -355,6 +424,7 @@ static void snd_frame(void)
     static volatile unsigned char *r;
     static const unsigned char *p;
 
+    if (music_off_t && !--music_off_t) music_stop();
     for (v = 0; v < 3; ++v)
     {
         if (sv_clip[v] == 0xFF) continue;
@@ -441,6 +511,17 @@ static unsigned char chase(void)
     return mode_i & 1;
 }
 
+/* Blinky as "Elroy": 1 or 2 with few dots left, 0 if not; never after a
+ * life is lost while Clyde is still in the house */
+static unsigned char elroy(void)
+{
+    static unsigned char left;
+
+    if (elroy_off) return 0;
+    left = total_dots - dots;
+    return left <= elroy2_left ? 2 : left <= elroy1_left;
+}
+
 static void ghost_target(unsigned char i)
 {
     static signed char ptx, pty, ox, oy;
@@ -451,7 +532,7 @@ static void ghost_target(unsigned char i)
         tgy = 14;
         return;
     }
-    if (!chase())
+    if (!chase() && !(i == 0 && elroy())) /* Elroy chases in scatter too */
     {
         tgx = corner_x[i];
         tgy = corner_y[i];
@@ -620,9 +701,15 @@ static unsigned char ghost_speed(unsigned char i)
     case G_ACTIVE: break;
     default: return SP_HOUSE;
     }
-    if (gfright[i]) return SP_GHOST_F;
-    if (TY(gy[i]) == 17 && (gx[i] < 48 || gx[i] >= 176)) return SP_TUNNEL;
-    return level > 1 ? SP_GHOST_N + 6 : SP_GHOST_N;
+    if (gfright[i]) return spd_fright[lv_spd];
+    if (TY(gy[i]) == 17 && (gx[i] < 48 || gx[i] >= 176)) return spd_tunnel[lv_spd];
+    if (i == 0)
+        switch (elroy())
+        {
+        case 2: return spd_elroy2[lv_spd];
+        case 1: return spd_elroy1[lv_spd];
+        }
+    return spd_ghost[lv_spd];
 }
 
 static void ghosts_reverse(void)
@@ -633,20 +720,51 @@ static void ghosts_reverse(void)
         if (gstate[i] == G_ACTIVE) gdir[i] ^= 2;
 }
 
-static void ghosts_release(void)
+/* the ghost first in the house (Pinky, Inky, Clyde), 0 if none */
+static unsigned char ghost_in_house(void)
 {
     unsigned char i;
 
     for (i = 1; i < 4; ++i)
-        if (gstate[i] == G_HOUSE)
-        {
-            if (life_dots >= house_dots[i] || idle >= 240)
-            {
-                gstate[i] = G_LEAVING;
-                idle = 0;
-            }
-            return; /* one at a time, in order */
-        }
+        if (gstate[i] == G_HOUSE) return i;
+    return 0;
+}
+
+/* a dot eaten: the counter of the ghost first in the house, or the one for
+ * all after a life is lost */
+static void house_count(void)
+{
+    unsigned char i;
+
+    idle = 0;
+    if (use_global)
+    {
+        ++global_dots;
+        return;
+    }
+    if ((i = ghost_in_house()) != 0) ++dot_cnt[i];
+}
+
+static void ghosts_release(void)
+{
+    unsigned char i = ghost_in_house(), go;
+
+    if (gstate[3] != G_HOUSE) elroy_off = 0;
+    if (!i) return; /* one at a time, in order */
+    if (use_global)
+    {
+        go = global_dots >= global_dots_at[i];
+        if (go && i == 3) use_global = 0; /* Clyde: back to the own counters */
+    }
+    else
+    {
+        go = dot_cnt[i] >= house_dots[lv_house][i];
+    }
+    if (go || idle >= lv_idle)
+    {
+        gstate[i] = G_LEAVING;
+        idle = 0;
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -664,9 +782,16 @@ static void add_digit(unsigned char k, unsigned char v)
     }
 }
 
-/* points in tens (decimal digits: no 32 bit divisions on the 6502) */
-static void add_score(unsigned char tens)
+/* points in tens, and hundreds more (decimal digits: no 32 bit divisions on
+ * the 6502) */
+static void add_score2(unsigned char tens, unsigned char hundreds)
 {
+    while (hundreds >= 10)
+    {
+        hundreds -= 10;
+        add_digit(3, 1);
+    }
+    add_digit(4, hundreds);
     while (tens >= 100)
     {
         tens -= 100;
@@ -692,18 +817,24 @@ static void add_score(unsigned char tens)
     put_digits(6, 1, score_d);
 }
 
+static void add_score(unsigned char tens)
+{
+    add_score2(tens, 0);
+}
+
+/* a power pellet: the ghosts turn back, and are frightened unless the level
+ * has no time for it */
 static void frighten(void)
 {
     unsigned char i;
-    static const unsigned char secs[6] = { 6, 5, 4, 3, 2, 1 };
 
-    fright_t = secs[level > 6 ? 5 : level - 1] * 60;
+    fright_t = lv_fright;
     ghosts_eaten = 0;
     for (i = 0; i < 4; ++i)
         if (gstate[i] != G_EYES && gstate[i] != G_ENTERING)
         {
             if (gstate[i] == G_ACTIVE) gdir[i] ^= 2;
-            gfright[i] = 1;
+            gfright[i] = fright_t != 0;
         }
 }
 
@@ -717,19 +848,20 @@ static void eat(void)
     mrow[ty][tx] = T_BLANK;
     put_tile(tx, ty, T_BLANK, PAL_MAZE);
     ++dots;
-    ++life_dots;
-    idle = 0;
+    house_count();
     snd_effect(dots & 1 ? SND_DOT1 : SND_DOT2);
     if (t == T_POWER)
     {
         add_score(5);
         frighten();
+        pac_stall = 3; /* Pac-Man stops while he eats */
     }
     else
     {
         add_score(1);
+        pac_stall = 1;
     }
-    if (dots == 70 || dots == 170) fruit_left = 600;
+    if (dots == 70 || dots == 170) fruit_left = 540 + (rand() & 63); /* 9-10 s */
 }
 
 static void pac_step(void)
@@ -808,13 +940,44 @@ static void no_sprite(void)
     VERA_DATA0 = 0;
 }
 
-/* the moving sprites, every frame: the ghosts and Pac-Man */
+/* the sprites of a scene (pacman_scene.py): slot s, code<<2 | flip, palette
+ * group (SCN_HIDDEN), the position bytes and the velocity of the arcade */
+static unsigned char sc_attr[SP_SCENE], sc_pal[SP_SCENE], sc_p0[SP_SCENE], sc_p1[SP_SCENE];
+static signed char sc_v0[SP_SCENE], sc_v1[SP_SCENE];
+
+static void scene_sprites(void)
+{
+    static unsigned char s;
+
+    vram_at(0xFC00u, 1);
+    for (s = 0; s < SP_SCENE; ++s)
+    {
+        if (sc_pal[s] == SCN_HIDDEN)
+        {
+            no_sprite();
+            continue;
+        }
+        sp_code = sc_attr[s] >> 2;
+        sp_flip = sc_attr[s] & 3;
+        sp_pal = sc_pal[s];
+        sp_x = 247 - sc_p0[s] - (s < 3); /* MAME: the slots 0-2 one pixel left */
+        sp_y = 280 - sc_p1[s];
+        sprite();
+    }
+}
+
+/* the moving sprites, every frame: the ghosts, Pac-Man and the fruit */
 static void draw_sprites(void)
 {
     static const unsigned char pac_h[4] = { S_PAC_C, 46, 44, 46 };
     static const unsigned char pac_v[4] = { S_PAC_C, 47, 45, 47 };
     static unsigned char i, k, hide;
 
+    if (phase == PH_SCENE)
+    {
+        scene_sprites();
+        return;
+    }
     vram_at(0xFC00u, 1);
     hide = phase == PH_TITLE || phase == PH_GAMEOVER;
     for (i = 0; i < 4; ++i)
@@ -840,7 +1003,7 @@ static void draw_sprites(void)
         else if (gfright[i])
         {
             sp_code = S_FRIGHT + (anim >> 3 & 1);
-            sp_pal = fright_t < 120 && (fright_t & 8) ? PAL_FLASH : PAL_FRIGHT;
+            sp_pal = fright_t < lv_flash && (fright_t & 8) ? PAL_FLASH : PAL_FRIGHT;
         }
         else
         {
@@ -853,55 +1016,45 @@ static void draw_sprites(void)
     if (hide || pac_hidden)
     {
         no_sprite();
-        return;
-    }
-    sp_x = px;
-    sp_y = py + 24;
-    sp_pal = PAL_PACMAN;
-    sp_flip = 0;
-    if (phase == PH_DYING && phase_t >= 60)
-    {
-        k = (phase_t - 60) >> 3;
-        if (k >= 12)
-        {
-            no_sprite();
-            return;
-        }
-        sp_code = S_DEATH + k;
     }
     else
     {
-        k = phase == PH_READY ? 0 : (panim >> 1) & 3;
-        if (pdir == LEFT || pdir == RIGHT)
+        sp_x = px;
+        sp_y = py + 24;
+        sp_pal = PAL_PACMAN;
+        sp_flip = 0;
+        k = 0;
+        if (phase == PH_DYING && phase_t >= 60)
         {
-            sp_code = pac_h[k];
-            sp_flip = pdir == LEFT;
+            k = (phase_t - 60) >> 3;
+            sp_code = S_DEATH + k;
         }
         else
         {
-            sp_code = pac_v[k];
-            sp_flip = pdir == UP ? 2 : 0;
+            k = phase == PH_READY ? 0 : (panim >> 1) & 3;
+            if (pdir == LEFT || pdir == RIGHT)
+            {
+                sp_code = pac_h[k];
+                sp_flip = pdir == LEFT;
+            }
+            else
+            {
+                sp_code = pac_v[k];
+                sp_flip = pdir == UP ? 2 : 0;
+            }
+            k = 0;
         }
+        if (k >= 12)
+            no_sprite();
+        else
+            sprite();
     }
-    sprite();
-}
 
-/* the fruit, the lives and the level: only when they change */
-static void draw_hud(void)
-{
-    static unsigned char key = 0xFF, k, fruit;
-
-    fruit = fruit_left && phase == PH_PLAY;
-    k = lives << 2 | fruit << 1 | (phase == PH_TITLE);
-    if (k == key) return;
-    key = k;
-
-    vram_at(0xFC00u + SP_FRUIT * 8, 1);
-    sp_code = S_CHERRY;
-    sp_pal = PAL_CHERRY;
-    sp_flip = 0;
-    if (fruit)
+    if (fruit_left && phase == PH_PLAY)
     {
+        sp_code = pac_fruit_spr[lv_fruit];
+        sp_pal = pac_fruit_pal[lv_fruit];
+        sp_flip = 0;
         sp_x = 112;
         sp_y = FRUIT_Y + 24;
         sprite();
@@ -910,40 +1063,208 @@ static void draw_hud(void)
     {
         no_sprite();
     }
-    sp_code = 44; /* Pac-Man, facing left */
-    sp_pal = PAL_PACMAN;
-    sp_flip = 1;
-    for (k = 0; k < 3; ++k)
+    no_sprite(); /* 6 and 7, used by the scenes */
+    no_sprite();
+}
+
+/* The bottom rows as on the arcade, only when they change: the lives left
+ * (but the one playing) from the left, the fruits of the last 7 levels from
+ * the right, the current level the leftmost.  2x2 tiles: the left column is
+ * code + 1, the right one code, the lower row + 2. */
+static void draw_hud(void)
+{
+    static unsigned char key_lives = 0xFF, key_level, y, x, t, pal, first, l;
+
+    if (!hud_dirty && key_lives == lives && key_level == level) return;
+    hud_dirty = 0;
+    key_lives = lives;
+    key_level = level;
+
+    first = level > 7 ? level - 6 : 1;
+    for (y = 34; y < 36; ++y)
     {
-        if (phase != PH_TITLE && k + 1 < lives)
+        vram_at(VRAM_MAP + ((unsigned int)y << 6), 0);
+        for (x = 0; x < 28; ++x)
         {
-            sp_x = 24 + k * 16;
-            sp_y = 280;
-            sprite();
+            t = T_BLANK;
+            pal = 0;
+            if (in_game && phase != PH_SCENE && x >= 2 && x < 12 && x < lives * 2)
+            {
+                t = T_LIFE;
+                pal = PAL_PACMAN;
+            }
+            else if (in_game && x >= 12 && x < 26 &&
+                     (l = first + ((25 - x) >> 1)) <= level)
+            {
+                l = l > FRUIT_LEVELS ? FRUIT_LEVELS - 1 : l - 1;
+                t = T_FRUIT + pac_fruit_spr[l] * 4;
+                pal = pac_fruit_pal[l];
+            }
+            if (t != T_BLANK) t += !(x & 1) + ((y - 34) << 1);
+            VERA_DATA0 = t;
+            VERA_DATA0 = pal << 4;
         }
-        else
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* Scenes: the attract mode and the intermissions (pacscn.h)            */
+/* ------------------------------------------------------------------ */
+
+static const unsigned char *scn_p;
+static unsigned char scn_wait, scn_id;
+
+static void set_phase(unsigned char p)
+{
+    phase = p;
+    phase_t = 0;
+    hud_dirty = 1;
+}
+
+/* the SCENE palette group: entry i of pac_scene_palette */
+static void scene_palette(unsigned char i)
+{
+    unsigned char k;
+    const unsigned char *c = pac_scene_palette + i * 8;
+
+    vram_at(0xFA00u + PAL_SCENE * 32, 1);
+    for (k = 0; k < 8; ++k) VERA_DATA0 = c[k];
+}
+
+/* the maze area blank, the sprites hidden, then the stream of the scene */
+static void scene_start(unsigned char id)
+{
+    unsigned char x, y;
+
+    for (y = 2; y < 34; ++y)
+    {
+        vram_at(VRAM_MAP + ((unsigned int)y << 6), 0);
+        for (x = 0; x < 28; ++x)
         {
-            no_sprite();
+            VERA_DATA0 = T_BLANK;
+            VERA_DATA0 = 0;
         }
     }
-    if (phase != PH_TITLE)
+    for (x = 0; x < SP_SCENE; ++x)
     {
-        sp_code = S_CHERRY;
-        sp_pal = PAL_CHERRY;
-        sp_flip = 0;
-        sp_x = 200;
-        sp_y = 280;
-        sprite();
+        sc_pal[x] = SCN_HIDDEN;
+        sc_v0[x] = sc_v1[x] = 0;
     }
-    else
+    scn_id = id;
+    scn_p = (const unsigned char *)(scn_ptr_lo[id] | (scn_ptr_hi[id] << 8));
+    scn_wait = 0;
+    set_phase(PH_SCENE);
+}
+
+static signed char nibble(unsigned char n)
+{
+    return n >= 8 ? (signed char)n - 16 : n;
+}
+
+/* One frame of the scene: the sprites move by their velocities, then the
+ * commands up to a WAIT run (pacman_scene.py).  0 at the end. */
+static unsigned char scene_frame(void)
+{
+    static unsigned char s, op;
+    static const unsigned char *p;
+
+    for (s = 0; s < SP_SCENE; ++s)
     {
-        no_sprite();
+        sc_p0[s] += sc_v0[s];
+        sc_p1[s] += sc_v1[s];
     }
+    if (scn_wait)
+    {
+        --scn_wait;
+        return 1;
+    }
+    p = scn_p;
+    while ((op = *p++) > SCN_WAIT)
+    {
+        s = op & 7;
+        switch (op & 0xF8)
+        {
+        case SCN_FULL:
+            sc_attr[s] = p[0];
+            sc_pal[s] = p[1];
+            sc_p0[s] = p[2];
+            sc_p1[s] = p[3];
+            sc_v0[s] = sc_v1[s] = 0;
+            p += 4;
+            break;
+        case SCN_POS:
+            sc_p0[s] = p[0];
+            sc_p1[s] = p[1];
+            p += 2;
+            break;
+        case SCN_VEL: /* the position moves by the change */
+            sc_p0[s] -= sc_v0[s];
+            sc_p1[s] -= sc_v1[s];
+            sc_v0[s] = nibble(*p >> 4);
+            sc_v1[s] = nibble(*p++ & 15);
+            sc_p0[s] += sc_v0[s];
+            sc_p1[s] += sc_v1[s];
+            break;
+        case SCN_ATTR:
+            sc_attr[s] = *p++;
+            break;
+        case SCN_PAL:
+            sc_pal[s] = *p++;
+            break;
+        default:
+            switch (op)
+            {
+            case SCN_TILE:
+                put_tiles(p[0], p[1], p + 2, 1, p[3]);
+                p += 4;
+                break;
+            case SCN_TEXT:
+                put_tiles(p[0], p[1], p + 4, p[2], p[3]);
+                p += 4 + p[2];
+                break;
+            case SCN_MUSIC:
+                music_play();
+                break;
+            case SCN_MUSIC_OFF:
+                music_stop();
+                break;
+            case SCN_SCENE_PAL:
+                scene_palette(*p++);
+                break;
+            case SCN_MUSIC_LATER:
+                music_off_t = *p++;
+                break;
+            }
+        }
+    }
+    scn_p = p;
+    if (!op) return 0;
+    scn_wait = op - 1;
+    return 1;
 }
 
 /* ------------------------------------------------------------------ */
 /* Game                                                                 */
 /* ------------------------------------------------------------------ */
+
+/* the row of the tables for the level */
+static void level_setup(void)
+{
+    unsigned char r = level > 19 ? 18 : level - 1;
+
+    lv_spd = level == 1 ? 0 : level < 5 ? 1
+                          : level < 21  ? 2
+                                        : 3;
+    lv_modes = level == 1 ? 0 : level < 5 ? 1
+                                          : 2;
+    lv_house = level < 3 ? level - 1 : 2;
+    lv_fruit = level > FRUIT_LEVELS ? FRUIT_LEVELS - 1 : level - 1;
+    lv_idle = level < 5 ? 240 : 180;
+    lv_fright = fright_secs[r] * 60;
+    lv_flash = fright_flashes[r] * 16;
+    elroy1_left = elroy_dots[r];
+    elroy2_left = elroy1_left >> 1;
+}
 
 static void positions_reset(void)
 {
@@ -957,11 +1278,13 @@ static void positions_reset(void)
     panim = 0;
     pmoving = 0;
     pac_hidden = 0;
+    pac_stall = 0;
     for (i = 0; i < 4; ++i)
     {
         gx[i] = ghost_x0[i];
         gy[i] = i ? HOUSE_Y : DOOR_Y;
-        gdir[i] = i ? (i & 1 ? UP : DOWN) : LEFT;
+        gdir[i] = i == 0 ? LEFT : i == 1 ? DOWN
+                                         : UP; /* as on the arcade */
         gstate[i] = i ? G_HOUSE : G_ACTIVE;
         gacc[i] = 0;
         gfright[i] = 0;
@@ -970,15 +1293,13 @@ static void positions_reset(void)
     mode_i = 0;
     mode_t = 0;
     freeze = 0;
-    life_dots = 0;
     idle = 0;
     fruit_left = 0;
-}
-
-static void set_phase(unsigned char p)
-{
-    phase = p;
-    phase_t = 0;
+    if (points_t)
+    {
+        points_t = 0;
+        clear_text(POINTS_X, 20, 4);
+    }
 }
 
 static void ready(unsigned char first)
@@ -995,29 +1316,55 @@ static void ready(unsigned char first)
     set_phase(PH_READY);
 }
 
+/* a new maze: the dots, the counters of the ghost house */
+static void start_level(unsigned char first)
+{
+    level_setup();
+    maze_reset();
+    memset(dot_cnt, 0, sizeof dot_cnt);
+    use_global = 0;
+    elroy_off = 0;
+    ready(first);
+}
+
 static void new_game(void)
 {
     memset(score_d, 0, sizeof score_d);
     lives = 3;
     level = 1;
     extra_given = 0;
-    maze_reset();
+    in_game = 1;
+    snd_stop_all();
     draw_status();
-    ready(1);
+    start_level(1);
 }
 
+/* the attract mode, then the maze with "push fire" */
 static void title(void)
 {
-    maze_reset();
+    in_game = 0;
     draw_status();
-    put_text(9, 20, "push fire", PAL_WHITE);
     snd_stop_all();
-    set_phase(PH_TITLE);
+    scene_start(SCN_ATTRACT);
+}
+
+static void scene_end(void)
+{
+    if (scn_id == SCN_ATTRACT)
+    {
+        maze_reset();
+        put_text(9, 20, "push fire", PAL_WHITE);
+        set_phase(PH_TITLE);
+    }
+    else
+    {
+        start_level(0);
+    }
 }
 
 static void collisions(void)
 {
-    unsigned char i, tx = TX(px), ty = TY(py);
+    unsigned char i, tx = TX(px), ty = TY(py), k;
 
     for (i = 0; i < 4; ++i)
     {
@@ -1043,7 +1390,10 @@ static void collisions(void)
     if (fruit_left && ty == 20 && (tx == 13 || tx == 14))
     {
         fruit_left = 0;
-        add_score(10);
+        k = pac_fruit_pts[lv_fruit];
+        add_score2(0, pac_fruit_points[k]);
+        put_tiles(POINTS_X, 20, pac_point_tiles + k * 4, 4, PAL_PINKY);
+        points_t = 120;
         snd_effect(SND_FRUIT);
     }
 }
@@ -1065,18 +1415,25 @@ static void play_frame(void)
         if (!--fright_t)
             for (i = 0; i < 4; ++i) gfright[i] = 0;
     }
-    else if (mode_frames[mode_i] && ++mode_t >= mode_frames[mode_i])
+    else if (mode_frames[lv_modes][mode_i] && ++mode_t >= mode_frames[lv_modes][mode_i])
     {
         mode_t = 0;
         ++mode_i;
         ghosts_reverse();
     }
 
-    pacc += fright_t ? SP_PAC_F : (level > 1 ? SP_PAC_F : SP_PAC_N);
-    while (pacc >= 64)
+    if (pac_stall)
     {
-        pacc -= 64;
-        pac_step();
+        --pac_stall; /* eating a dot */
+    }
+    else
+    {
+        pacc += fright_t ? spd_pac_f[lv_spd] : spd_pac_n[lv_spd];
+        while (pacc >= 64 && !pac_stall)
+        {
+            pacc -= 64;
+            pac_step();
+        }
     }
     collisions();
     if (phase != PH_PLAY || freeze) return;
@@ -1096,6 +1453,7 @@ static void play_frame(void)
     if (idle < 255) ++idle;
     ghosts_release();
     if (fruit_left) --fruit_left;
+    if (points_t && !--points_t) clear_text(POINTS_X, 20, 4);
 
     /* the power pellets blink */
     if ((anim & 15) == 0)
@@ -1134,12 +1492,23 @@ static void play_frame(void)
 
 static void frame(void)
 {
+    static unsigned char done;
+
     ++anim;
     ++phase_t;
     switch (phase)
     {
     case PH_TITLE:
-        if (fire()) new_game();
+        if (fire())
+            new_game();
+        else if (phase_t >= 600)
+            title();
+        break;
+    case PH_SCENE:
+        if (scn_id == SCN_ATTRACT && fire())
+            new_game();
+        else if (!scene_frame())
+            scene_end();
         break;
     case PH_READY:
         if (phase_t == 120) clear_text(9, 14, 10);
@@ -1163,6 +1532,9 @@ static void frame(void)
             }
             else
             {
+                use_global = 1; /* the house counts for all */
+                global_dots = 0;
+                elroy_off = 1; /* until Clyde is out */
                 ready(0);
             }
         }
@@ -1172,9 +1544,17 @@ static void frame(void)
         if (phase_t >= 60 + 8 * 12)
         {
             wall_colour(0);
-            ++level;
-            maze_reset();
-            ready(0);
+            done = level;
+            if (level < 255) ++level;
+            /* the intermissions after the levels 2, 5, 9, 13, 17 */
+            if (done == 2)
+                scene_start(SCN_ACT1);
+            else if (done == 5)
+                scene_start(SCN_ACT2);
+            else if (done == 9 || done == 13 || done == 17)
+                scene_start(SCN_ACT3);
+            else
+                start_level(0);
         }
         break;
     case PH_GAMEOVER:

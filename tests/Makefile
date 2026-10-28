@@ -28,13 +28,14 @@ PLAYER_DATA   = demo.vtm.prg $(if $(NO_IMAGE),,demo.vbm.prg)
 # Pac-Man (test_pacman.c) with the graphics and the sounds of the arcade, from
 # the MAME ROM set "pacman" (not in the repository): built only when
 # PACMAN_ZIP is there.  The sounds are ripped by running the game in MAME
-# (pacman_rip.lua, about a minute); gen/pacman_rip.log is kept, so MAME is
-# needed only once.  pacman.prg stays off the D64 (no room, and the ROM data
-# is not ours to hand out).  Joystick in port 2; in VICE also on the cursor
+# (pacman_rip.lua, about a minute), and so are the attract mode and the
+# intermissions with their song (pacman_scenes.lua, a few seconds); the logs
+# in gen/ are kept, so MAME is needed only once.  pacman.prg stays off the
+# D64 (no room, and the ROM data is not ours to hand out).  Joystick in port 2; in VICE also on the cursor
 # keys and SPACE: JOYKEYS=1 tools/run-vice.sh tests/pacman.prg
 PACMAN_ZIP ?= $(HOME)/Downloads/pacman.zip
 MAME       ?= mame
-PACMAN     = $(and $(wildcard $(PACMAN_ZIP)),$(or $(wildcard gen/pacman_rip.log),$(shell command -v $(MAME))),pacman.prg)
+PACMAN     = $(and $(wildcard $(PACMAN_ZIP)),$(or $(and $(wildcard gen/pacman_rip.log),$(wildcard gen/pacman_scenes.log)),$(shell command -v $(MAME))),pacman.prg)
 
 PRGS = testfx.prg testirq.prg $(TEXT_PRGS) testplr.prg $(PLAYER_DATA) vic_mirror.prg testmem.prg $(PACMAN)
 
@@ -80,8 +81,8 @@ demo.vtm.prg: $(DEMO_SONG_SRC) tools/vtm_compile.py
 demo.vbm.prg: $(DEMO_IMAGE)
 	cp $< $@
 
-pacman.prg: test_pacman.c gen/pacgfx.s gen/pacgfx.h gen/pacsnd.s gen/pacsnd.h $(HEADERS)
-	$(CL65) $(CFLAGS) -Oirs -o $@ test_pacman.c gen/pacgfx.s gen/pacsnd.s
+pacman.prg: test_pacman.c gen/pacgfx.s gen/pacgfx.h gen/pacsnd.s gen/pacsnd.h gen/pacscn.s gen/pacscn.h $(HEADERS)
+	$(CL65) $(CFLAGS) -Oirs -o $@ test_pacman.c gen/pacgfx.s gen/pacsnd.s gen/pacscn.s
 
 gen/pacgfx.s: pacman_gfx.py $(PACMAN_ZIP)
 	mkdir -p gen
@@ -94,9 +95,18 @@ gen/pacman_rip.log: pacman_rip.lua $(PACMAN_ZIP)
 	PACRIP_OUT=$@ $(MAME) pacman -rompath $(dir $(PACMAN_ZIP)) -video none -sound none \
 	    -nothrottle -skip_gameinfo -seconds_to_run 120 -autoboot_script pacman_rip.lua
 
-gen/pacsnd.s: pacman_snd.py gen/pacman_rip.log
-	$(PYTHON) pacman_snd.py gen/pacman_rip.log $@ gen/pacsnd.h
+gen/pacman_scenes.log: pacman_scenes.lua $(PACMAN_ZIP)
+	mkdir -p gen
+	PACSCN_OUT=$@ $(MAME) pacman -rompath $(dir $(PACMAN_ZIP)) -video none -sound none \
+	    -nothrottle -skip_gameinfo -seconds_to_run 200 -autoboot_script pacman_scenes.lua
+
+gen/pacsnd.s: pacman_snd.py gen/pacman_rip.log gen/pacman_scenes.log
+	$(PYTHON) pacman_snd.py gen/pacman_rip.log gen/pacman_scenes.log $@ gen/pacsnd.h
 gen/pacsnd.h: gen/pacsnd.s ;
 
+gen/pacscn.s: pacman_scene.py pacman_gfx.py gen/pacman_scenes.log
+	$(PYTHON) pacman_scene.py gen/pacman_scenes.log $@ gen/pacscn.h
+gen/pacscn.h: gen/pacscn.s ;
+
 clean:
-	rm -f *.prg *.o *.map gen/pacgfx.* gen/pacsnd.*
+	rm -f *.prg *.o *.map gen/pacgfx.* gen/pacsnd.* gen/pacscn.*

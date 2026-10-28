@@ -69,10 +69,16 @@ Comprehensive test programs for VERA functionality, including:
 
 #### Pac-Man (`pacman.prg`)
 
-A simple Pac-Man on the VERA with the graphics and the sounds of the arcade
+Pac-Man on the VERA with the graphics, the sounds and the music of the arcade
 (Namco, 1980): the maze, the four ghosts with their arcade targeting
-(scatter/chase, frightened, eyes going home), power pellets, the cherry, lives
-and levels. The 224x288 arcade screen is shown on layer 0, scaled to the 480
+(scatter/chase, frightened, eyes going home), power pellets, lives, and the
+levels of the arcade: the fruit of every level and its points, the speeds of
+Pac-Man and of the ghosts, the frightened time and flashes, the scatter/chase
+periods, Blinky's "Elroy" speed-ups, the dot counters of the ghost house, the
+fruits of the last 7 levels at the bottom right. The attract mode (the
+characters and their nicknames, the chase of the power pellet) plays before a
+game, the three intermissions with their song after the levels 2, 5, 9, 13
+and 17. The 224x288 arcade screen is shown on layer 0, scaled to the 480
 lines of the VGA output; the three voices of the arcade sound chip play on the
 SID. It runs at 60 frames per second on the VSYNC of the VERA.
 
@@ -82,7 +88,14 @@ MAME ROM set `pacman` (a file named `pacman.zip`, by default
 - `tests/pacman_gfx.py` - tiles, sprites, palette and maze for the VERA
 - `tests/pacman_rip.lua` - run by MAME: plays a game and logs the sound chip
   frame by frame (about a minute, needed once: the log is kept)
-- `tests/pacman_snd.py` - turns the log into SID data
+- `tests/pacman_scenes.lua` - run by MAME: records the attract mode and the
+  three intermissions frame by frame (tiles, sprites, sound chip; a few
+  seconds, needed once: the log is kept). The intermissions are reached by
+  ending the levels 2, 5 and 9 at once through the RAM of the game
+- `tests/pacman_snd.py` - turns the logs into SID data (the intermission song
+  from the scenes log)
+- `tests/pacman_scene.py` - turns the scenes into compact command streams
+  (about 9.6 KB) for the scene player of `test_pacman.c`
 
 Everything generated goes to `tests/gen/` (not committed). `pacman.prg` is built
 only when the ROM set is there, and is left off `vera-c64.d64` (no room, and it
@@ -212,6 +225,8 @@ VERA_C64/
 │   ├── pacman_gfx.py                           # arcade graphics → VERA
 │   ├── pacman_rip.lua                          # MAME script: rips the arcade sounds
 │   ├── pacman_snd.py                           # ripped sounds → SID data
+│   ├── pacman_scenes.lua                       # MAME script: records attract mode and intermissions
+│   ├── pacman_scene.py                         # recorded scenes → scene streams
 │   ├── gen/                                    # Generated from the ROMs (not committed)
 │   └── [Various other test programs]
 │
@@ -305,7 +320,7 @@ x64sc -vera -autostart driver/vera80.prg &
   # Compile and install VICE
   ```
 
-- **MAME** (optional) - only for Pac-Man, to rip the arcade sounds once
+- **MAME** (optional) - only for Pac-Man, to rip the arcade sounds and scenes once
 
 - **CC65** compiler suite
   ```bash

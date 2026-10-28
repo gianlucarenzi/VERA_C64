@@ -8,5 +8,7 @@
 /driver/gen/
 # converted from the Pac-Man arcade ROMs: not to be committed
 /tests/gen/
-# written by MAME while pacman_rip.lua runs
+# written by MAME while pacman_rip.lua / pacman_scenes.lua run
 /tests/history/
+# pacman_scene.py imports pacman_gfx.py
+__pycache__/
