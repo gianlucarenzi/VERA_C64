@@ -3,6 +3,8 @@
 
 CL65      = cl65
 CA65      = ca65
+LD65      = ld65
+C1541    ?= c1541
 PYTHON   ?= python3
 VERA_BASE ?= 0xDE00
 
@@ -32,12 +34,14 @@ PLAYER_DATA   = demo.vtm.prg $(if $(NO_IMAGE),,demo.vbm.prg)
 # intermissions with their song (pacman_scenes.lua, a few seconds); the logs
 # in gen/ are kept, so MAME is needed only once.  pacman.prg stays off the
 # D64 (no room, and the ROM data is not ours to hand out).  Joystick in port 2; in VICE also on the cursor
-# keys and SPACE: JOYKEYS=1 tools/run-vice.sh tests/pacman.prg
+# keys and SPACE: JOYKEYS=1 tools/run-vice.sh tests/pacman.d64 (with the
+# loader) or tests/pacman.prg
 PACMAN_ZIP ?= $(HOME)/Downloads/pacman.zip
 MAME       ?= mame
 PACMAN     = $(and $(wildcard $(PACMAN_ZIP)),$(or $(and $(wildcard gen/pacman_rip.log),$(wildcard gen/pacman_scenes.log)),$(shell command -v $(MAME))),pacman.prg)
 
-PRGS = testfx.prg testirq.prg $(TEXT_PRGS) testplr.prg $(PLAYER_DATA) vic_mirror.prg testmem.prg $(PACMAN)
+PRGS = testfx.prg testirq.prg $(TEXT_PRGS) testplr.prg $(PLAYER_DATA) vic_mirror.prg testmem.prg \
+       $(if $(PACMAN),$(PACMAN) pacman_loader.prg pacman.d64)
 
 .PHONY: all clean
 all: $(PRGS)
@@ -108,5 +112,22 @@ gen/pacscn.s: pacman_scene.py pacman_gfx.py gen/pacman_scenes.log
 	$(PYTHON) pacman_scene.py gen/pacman_scenes.log $@ gen/pacscn.h
 gen/pacscn.h: gen/pacscn.s ;
 
+# pacman.d64: the loader "pacman" first (LOAD"*",8 and VICE autostart take
+# it), then the program as "pacman data".  The loader shows a progress bar
+# on the C64 screen, in the font of the arcade (pacman_font.py), and keeps
+# the VERA black while it reads the program; the size of pacman.prg sets its
+# thresholds.
+pacman_loader.prg: pacman_loader.s pacman_loader.cfg gen/pacfont.inc pacman.prg $(INC)/vera_common.inc
+	$(CA65) $(ASFLAGS) -D MAIN_BYTES=$$(stat -c %s pacman.prg) -o pacman_loader.o pacman_loader.s
+	$(LD65) -C pacman_loader.cfg -o $@ pacman_loader.o
+
+gen/pacfont.inc: pacman_font.py pacman_gfx.py $(PACMAN_ZIP)
+	mkdir -p gen
+	$(PYTHON) pacman_font.py $(PACMAN_ZIP) $@
+
+pacman.d64: pacman_loader.prg pacman.prg
+	rm -f $@
+	$(C1541) -format "pac-man,pm" d64 $@ -write pacman_loader.prg pacman -write pacman.prg "pacman data" > /dev/null
+
 clean:
-	rm -f *.prg *.o *.map gen/pacgfx.* gen/pacsnd.* gen/pacscn.*
+	rm -f *.prg *.o *.map pacman.d64 gen/pacgfx.* gen/pacsnd.* gen/pacscn.* gen/pacfont.*

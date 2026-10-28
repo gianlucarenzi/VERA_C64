@@ -96,14 +96,26 @@ MAME ROM set `pacman` (a file named `pacman.zip`, by default
   from the scenes log)
 - `tests/pacman_scene.py` - turns the scenes into compact command streams
   (about 9.6 KB) for the scene player of `test_pacman.c`
+- `tests/pacman_font.py` - the font of the arcade as C64 characters, for the
+  loader
 
 Everything generated goes to `tests/gen/` (not committed). `pacman.prg` is built
 only when the ROM set is there, and is left off `vera-c64.d64` (no room, and it
 contains ROM data).
 
+The disk `tests/pacman.d64` holds the loader `PACMAN` (`tests/pacman_loader.s`)
+and the program as `PACMAN DATA`. `LOAD"*",8` and `RUN` start the loader: a
+progress bar on the C64 screen, in the font of the arcade, while the program
+loads at the speed of the KERNAL (about 100 seconds from a 1541), the VERA
+black meanwhile; then the game starts by itself. The loader works in the VIC
+bank 3 (screen `$C000`, loader `$C400`, font `$C800`), out of the way of the
+program (`$0801`-`$AEFF`), and gives the C64 back its bank and font before
+the RUN.
+
 ```bash
 make PACMAN_ZIP=/path/to/pacman.zip       # or just make, with ~/Downloads/pacman.zip
-JOYKEYS=1 tools/run-vice.sh tests/pacman.prg
+JOYKEYS=1 tools/run-vice.sh tests/pacman.d64      # with the loader
+JOYKEYS=1 tools/run-vice.sh tests/pacman.prg      # the program alone
 ```
 
 Controls: joystick in port 2, fire to start. In VICE, `JOYKEYS=1` puts the
@@ -164,8 +176,8 @@ x64sc -vera vera-c64.d64 &
 x64sc -vera -autostart driver/vera80.prg &
 x64sc -vera -autostart rmt/rmtplay.prg &
 
-# Pac-Man, with the joystick in port 2 on the cursor keys and SPACE
-JOYKEYS=1 tools/run-vice.sh tests/pacman.prg
+# Pac-Man (disk with the loader), with the joystick in port 2 on the cursor keys and SPACE
+JOYKEYS=1 tools/run-vice.sh tests/pacman.d64
 ```
 
 ## 📚 Documentation
@@ -227,6 +239,8 @@ VERA_C64/
 │   ├── pacman_snd.py                           # ripped sounds → SID data
 │   ├── pacman_scenes.lua                       # MAME script: records attract mode and intermissions
 │   ├── pacman_scene.py                         # recorded scenes → scene streams
+│   ├── pacman_loader.s / .cfg                  # loader with progress bar (pacman.d64)
+│   ├── pacman_font.py                          # arcade font → C64 characters
 │   ├── gen/                                    # Generated from the ROMs (not committed)
 │   └── [Various other test programs]
 │
