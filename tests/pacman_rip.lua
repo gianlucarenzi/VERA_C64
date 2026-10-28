@@ -1,5 +1,5 @@
 -- pacman_rip.lua - MAME autoboot script: rips the sounds of the Pac-Man arcade
--- for test_pacman.c (pacman_snd.py converts the log to SID data).
+-- for pacman.c (pacman_snd.py converts the log to SID data).
 --
 --   mame pacman -rompath DIR -video none -sound none -nothrottle \
 --        -seconds_to_run 120 -autoboot_script pacman_rip.lua

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """pacman_snd.py - the sounds of the Pac-Man arcade, ripped by pacman_rip.lua
-in MAME, as SID data for test_pacman.c.
+in MAME, as SID data for pacman.c.
 
     python3 pacman_snd.py pacman_rip.log pacman_scenes.log gen/pacsnd.s gen/pacsnd.h
 

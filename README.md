@@ -100,7 +100,7 @@ MAME ROM set `pacman` (a file named `pacman.zip`, by default
 - `tests/pacman_snd.py` - turns the logs into SID data (the intermission song
   from the scenes log)
 - `tests/pacman_scene.py` - turns the scenes into compact command streams
-  (about 9.6 KB) for the scene player of `test_pacman.c`
+  (about 9.6 KB) for the scene player of `pacman.c`
 - `tests/pacman_font.py` - the font of the arcade as C64 characters, for the
   loader
 
@@ -238,7 +238,7 @@ VERA_C64/
 │
 ├── tests/                                       # Test Suite
 │   ├── vic_mirror.c                            # VIC-II mirroring example
-│   ├── test_pacman.c                           # Pac-Man (pacman.prg)
+│   ├── pacman.c                                # Pac-Man (pacman.prg)
 │   ├── pacman_gfx.py                           # arcade graphics → VERA
 │   ├── pacman_rip.lua                          # MAME script: rips the arcade sounds
 │   ├── pacman_snd.py                           # ripped sounds → SID data

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """pacman_gfx.py - the graphics of the Pac-Man arcade (MAME set "pacman") in
-the formats of the VERA, for test_pacman.c.
+the formats of the VERA, for pacman.c.
 
     python3 pacman_gfx.py pacman.zip gen/pacgfx.s gen/pacgfx.h [preview.png]
 

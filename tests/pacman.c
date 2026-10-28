@@ -1,4 +1,4 @@
-/* test_pacman.c - a simple Pac-Man on the VERA, with the graphics and the
+/* pacman.c - a simple Pac-Man on the VERA, with the graphics and the
  * sounds of the arcade (Namco 1980), on the C64.
  *
  * The ROMs are not in the repository: pacman_gfx.py converts the graphics of

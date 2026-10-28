@@ -27,7 +27,7 @@ DEMO_IMAGE    ?= songs/DEMO.VBM
 NO_IMAGE      ?= 1
 PLAYER_DATA   = demo.vtm.prg $(if $(NO_IMAGE),,demo.vbm.prg)
 
-# Pac-Man (test_pacman.c) with the graphics and the sounds of the arcade, from
+# Pac-Man (pacman.c) with the graphics and the sounds of the arcade, from
 # the MAME ROM set "pacman" (not in the repository): built only when
 # PACMAN_ZIP is there.  The sounds are ripped by running the game in MAME
 # (pacman_rip.lua, about a minute), and so are the attract mode and the
@@ -85,8 +85,8 @@ demo.vtm.prg: $(DEMO_SONG_SRC) tools/vtm_compile.py
 demo.vbm.prg: $(DEMO_IMAGE)
 	cp $< $@
 
-pacman.prg: test_pacman.c pacman_maze.o gen/pacgfx.s gen/pacgfx.h gen/pacsnd.s gen/pacsnd.h gen/pacscn.s gen/pacscn.h $(HEADERS)
-	$(CL65) $(CFLAGS) -Oirs -o $@ test_pacman.c pacman_maze.o gen/pacgfx.s gen/pacsnd.s gen/pacscn.s
+pacman.prg: pacman.c pacman_maze.o gen/pacgfx.s gen/pacgfx.h gen/pacsnd.s gen/pacsnd.h gen/pacscn.s gen/pacscn.h $(HEADERS)
+	$(CL65) $(CFLAGS) -Oirs -o $@ pacman.c pacman_maze.o gen/pacgfx.s gen/pacsnd.s gen/pacscn.s
 
 gen/pacgfx.s: pacman_gfx.py $(PACMAN_ZIP)
 	mkdir -p gen

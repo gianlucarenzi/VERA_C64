@@ -1,4 +1,4 @@
-; pacman_maze.s - the maze bitmap of test_pacman.c, fast: for every row of
+; pacman_maze.s - the maze bitmap of pacman.c, fast: for every row of
 ; the picture (pac_maze_src: its maze row) the 28 tiles of that maze row,
 ; one 2 bpp line of each turned into 4 bytes of the 4 bpp bitmap (the arcade
 ; colours), then 48 zeros to the end of the 160 bytes of the row, so that

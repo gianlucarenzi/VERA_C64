@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """pacman_scene.py - the scenes of the Pac-Man arcade that are not the game,
 recorded in MAME by pacman_scenes.lua, as streams for the scene player of
-test_pacman.c.
+pacman.c.
 
     python3 pacman_scene.py pacman_scenes.log gen/pacscn.s gen/pacscn.h
 

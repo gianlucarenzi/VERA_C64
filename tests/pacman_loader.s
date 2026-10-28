@@ -247,7 +247,7 @@ vic_back:
         rts
 
 ; the VERA selected, black: no layers and no sprites, black border and
-; colour 0; the output mode as it is, VGA if off (as test_pacman.c)
+; colour 0; the output mode as it is, VGA if off (as pacman.c)
 vera_black:
         lda     #1
         sta     VERA_CARDSEL

@@ -1,5 +1,5 @@
 -- pacman_scenes.lua - MAME autoboot script: records the scenes of the Pac-Man
--- arcade that are not the game for test_pacman.c (pacman_scene.py converts
+-- arcade that are not the game for pacman.c (pacman_scene.py converts
 -- the log): the attract mode up to the demo game (the characters and their
 -- nicknames, the chase of the power pellet) and the three intermissions with
 -- their music.
