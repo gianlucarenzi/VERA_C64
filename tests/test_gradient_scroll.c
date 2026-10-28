@@ -18,30 +18,30 @@
 #include "vtext.h"
 
 /* KERNAL jiffy clock TIME ($A0-$A2), low byte: 60 Hz */
-#define RTCLOK       (*(volatile unsigned char *)0x00A2)
+#define RTCLOK (*(volatile unsigned char *)0x00A2)
 
 /* ------------------------------------------------------------------ */
 /* VRAM / tilemap constants                                            */
 /* ------------------------------------------------------------------ */
 
 /* Tilemap at $01B000; stride = 128 cells * 2 bytes = 256 bytes/row   */
-#define MAP_COLS   128
-#define MAP_ROWS    64
+#define MAP_COLS 128
+#define MAP_ROWS 64
 
 /* ADDR_H: bank=1 (bit 0), auto-increment by 1 (bits[7:4] = 0x1)     */
-#define ADDR_H_INC1  0x11
+#define ADDR_H_INC1 0x11
 
 /* HSCROLL / VSCROLL wrap modulo (12-bit registers; tilemap pixel     */
 /* extent = 128*8 = 1024 wide, 64*16 = 1024 tall for 8×16 font; the   */
 /* VERA wraps the 512 pixels of the 8×8 font by itself)              */
-#define SCROLL_WRAP  1024u
+#define SCROLL_WRAP 1024u
 
 /* Pixels to cover per direction per cycle                             */
-#define SCROLL_STEP   50
+#define SCROLL_STEP 50
 
 /* Speed range in pixels/frame — triangle wave between these limits   */
-#define MIN_SPEED     1
-#define MAX_SPEED     8
+#define MIN_SPEED 1
+#define MAX_SPEED 8
 
 /* ------------------------------------------------------------------ */
 
@@ -65,9 +65,9 @@ static void fill_gradient(void)
          * ADDR_L is always 0 because stride == 256 and base is
          * aligned to 256.  ADDR_M = $B0 + row (0..63 → $B0..$EF). */
         VERA_CTRL = 0x00;
-        VERA_ADDR_L   = 0x00;
-        VERA_ADDR_M   = (unsigned char)(0xB0 + row);
-        VERA_ADDR_H   = ADDR_H_INC1;
+        VERA_ADDR_L = 0x00;
+        VERA_ADDR_M = (unsigned char)(0xB0 + row);
+        VERA_ADDR_H = ADDR_H_INC1;
 
         for (col = 0; col < MAP_COLS; col++)
         {
@@ -76,13 +76,12 @@ static void fill_gradient(void)
             VERA_DATA0 = (colour << 4) | colour; /* bg == fg          */
         }
     }
-
 }
 
 /* Write HSCROLL and VSCROLL registers for layer 1 (12-bit each).    */
 static void set_scroll(unsigned int h, unsigned int v)
 {
-    VERA_CTRL  = 0x00;
+    VERA_CTRL = 0x00;
     VERA_L1_HSCR_L = (unsigned char)(h & 0xFF);
     VERA_L1_HSCR_H = (unsigned char)((h >> 8) & 0x0F);
     VERA_L1_VSCR_L = (unsigned char)(v & 0xFF);
@@ -117,10 +116,10 @@ int main(void)
 {
     unsigned int hscroll = 0, vscroll = 0;
     unsigned char speed = MIN_SPEED;
-    signed char  delta  = 1;           /* +1 = accelerating, -1 = decelerating */
+    signed char delta = 1; /* +1 = accelerating, -1 = decelerating */
     unsigned char pixels;
 
-    putchar(14);            /* lower/upper case character set */
+    putchar(14); /* lower/upper case character set */
     vera_require();
     printf("Gradient and scroll on the VERA\n");
     printf("(%ux%u). Press a key to exit.\n", VT_COLS, VT_ROWS);
@@ -178,8 +177,8 @@ int main(void)
         }
     }
 
-    cgetc();             /* consume the keypress */
-    set_scroll(0, 0);    /* restore scroll origin */
+    cgetc();          /* consume the keypress */
+    set_scroll(0, 0); /* restore scroll origin */
     vt_clear();
     vt_puts("Test ended.\n");
     printf("Test ended.\n");

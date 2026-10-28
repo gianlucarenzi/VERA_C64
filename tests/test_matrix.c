@@ -33,8 +33,8 @@
  * All VRAM addresses are in bank 1, so ADDR_HI bit 0 is always 1. */
 #define VRAM_MAP     0x01B000UL
 #define ROW_STRIDE   256u
-#define ADDR_H_INC1  0x11   /* inc=+1, bank=1 */
-#define ADDR_H_NOINC 0x01   /* inc=0,  bank=1 */
+#define ADDR_H_INC1  0x11 /* inc=+1, bank=1 */
+#define ADDR_H_NOINC 0x01 /* inc=0,  bank=1 */
 
 /* We program the VERA palette ourselves so colours are independent of
  * whatever VERA.SYS loaded.  Palette VRAM starts at $1FA00 (bank 1).
@@ -51,21 +51,21 @@
  *   3    dk-grn   #004400    0x40   0x00
  *   4    black    #000000    0x00   0x00   ← cell bg (safe slot)
  */
-#define VERA_PAL_BASE  0x1FA00UL
-#define COL_BG_IDX   4           /* palette index used for black cell background */
+#define VERA_PAL_BASE 0x1FA00UL
+#define COL_BG_IDX    4 /* palette index used for black cell background */
 
 /* Tilemap colour byte = (bg_nibble << 4) | fg_nibble.
  * bg nibble = COL_BG_IDX = 4 for all cells so cell backgrounds are
  * palette[4] = black. */
-#define COL_BLACK    0x44   /* space: bg=4(blk), fg=4(blk) */
-#define COL_WHITE    0x41   /* head:  bg=4(blk), fg=1(wht) */
-#define COL_LGRE     0x42   /* zone:  bg=4(blk), fg=2(lgr) */
-#define COL_DGRE     0x43   /* zone:  bg=4(blk), fg=3(dgr) */
+#define COL_BLACK 0x44 /* space: bg=4(blk), fg=4(blk) */
+#define COL_WHITE 0x41 /* head:  bg=4(blk), fg=1(wht) */
+#define COL_LGRE  0x42 /* zone:  bg=4(blk), fg=2(lgr) */
+#define COL_DGRE  0x43 /* zone:  bg=4(blk), fg=3(dgr) */
 
 /* Trail geometry (rows behind the white head) */
-#define ZONE_LIGHT   5
-#define ZONE_DARK    8
-#define ZONE_TOTAL   (ZONE_LIGHT + ZONE_DARK)
+#define ZONE_LIGHT 5
+#define ZONE_DARK  8
+#define ZONE_TOTAL (ZONE_LIGHT + ZONE_DARK)
 
 /* Steps per VBI frame: 2 = double visual speed */
 #define STEPS_PER_FRAME 2
@@ -74,14 +74,14 @@
 #define SPAWN_THRESH 13
 
 /* Entropy for seeding: jiffy clock and CIA 1 timer A, low bytes */
-#define RTCLOK_L      (*(volatile unsigned char*)0x00A2)
-#define CIA1_TA_LO    (*(volatile unsigned char*)0xDC04)
+#define RTCLOK_L   (*(volatile unsigned char *)0x00A2)
+#define CIA1_TA_LO (*(volatile unsigned char *)0xDC04)
 
-#define MAX_COLS  80
+#define MAX_COLS 80
 
-static int           screen_width  = VT_COLS;
-static int           screen_height = VT_ROWS;
-static unsigned char saved_border = 6;   /* DC_BORDER at entry, restored on exit */
+static int screen_width = VT_COLS;
+static int screen_height = VT_ROWS;
+static unsigned char saved_border = 6; /* DC_BORDER at entry, restored on exit */
 
 static unsigned char col_head[MAX_COLS];
 static unsigned char col_active[MAX_COLS];
@@ -107,29 +107,38 @@ static unsigned char fast_rand(void)
 /* Original VERA default palette entries 1..4 (GGGGBBBB, 0000RRRR), restored on exit */
 static void restore_default_palette(void)
 {
-    VERA_CTRL     = 0;
-    VERA_ADDR_LO  = 0x02;            /* entry 1 = $1FA02 */
+    VERA_CTRL = 0;
+    VERA_ADDR_LO = 0x02; /* entry 1 = $1FA02 */
     VERA_ADDR_MID = 0xFA;
-    VERA_ADDR_HI  = ADDR_H_INC1;
-    VERA_DATA0 = 0xFF; VERA_DATA0 = 0x0F;   /* 1: #FFFFFF */
-    VERA_DATA0 = 0x00; VERA_DATA0 = 0x08;   /* 2: #880000 */
-    VERA_DATA0 = 0xFE; VERA_DATA0 = 0x0A;   /* 3: #AAFFEE */
-    VERA_DATA0 = 0x4C; VERA_DATA0 = 0x0C;   /* 4: #CC44CC */
+    VERA_ADDR_HI = ADDR_H_INC1;
+    VERA_DATA0 = 0xFF;
+    VERA_DATA0 = 0x0F; /* 1: #FFFFFF */
+    VERA_DATA0 = 0x00;
+    VERA_DATA0 = 0x08; /* 2: #880000 */
+    VERA_DATA0 = 0xFE;
+    VERA_DATA0 = 0x0A; /* 3: #AAFFEE */
+    VERA_DATA0 = 0x4C;
+    VERA_DATA0 = 0x0C; /* 4: #CC44CC */
 }
 
 static void setup_matrix_palette(void)
 {
     /* Write 5 consecutive palette entries starting at $1FA00.
      * Auto-increment=1 streams all 10 bytes in one sequential burst. */
-    VERA_CTRL     = 0;       /* ensure DCSEL=0 */
-    VERA_ADDR_LO  = 0x00;
+    VERA_CTRL = 0; /* ensure DCSEL=0 */
+    VERA_ADDR_LO = 0x00;
     VERA_ADDR_MID = 0xFA;
-    VERA_ADDR_HI  = ADDR_H_INC1;   /* bank=1, inc=+1 */
-    VERA_DATA0 = 0x00; VERA_DATA0 = 0x00;   /* 0: black    #000000 */
-    VERA_DATA0 = 0xFF; VERA_DATA0 = 0x0F;   /* 1: white    #FFFFFF */
-    VERA_DATA0 = 0xF0; VERA_DATA0 = 0x00;   /* 2: lt-grn   #00FF00 */
-    VERA_DATA0 = 0x40; VERA_DATA0 = 0x00;   /* 3: dk-grn   #004400 */
-    VERA_DATA0 = 0x00; VERA_DATA0 = 0x00;   /* 4: black    #000000 (cell bg) */
+    VERA_ADDR_HI = ADDR_H_INC1; /* bank=1, inc=+1 */
+    VERA_DATA0 = 0x00;
+    VERA_DATA0 = 0x00; /* 0: black    #000000 */
+    VERA_DATA0 = 0xFF;
+    VERA_DATA0 = 0x0F; /* 1: white    #FFFFFF */
+    VERA_DATA0 = 0xF0;
+    VERA_DATA0 = 0x00; /* 2: lt-grn   #00FF00 */
+    VERA_DATA0 = 0x40;
+    VERA_DATA0 = 0x00; /* 3: dk-grn   #004400 */
+    VERA_DATA0 = 0x00;
+    VERA_DATA0 = 0x00; /* 4: black    #000000 (cell bg) */
 
     /* DC_BORDER (DCSEL=0): palette index for the display border/
      * background area outside the tilemap.  Point it to our black entry. */
@@ -143,9 +152,9 @@ static void setup_matrix_palette(void)
 static void vera_put_char(int x, int y, unsigned char ch, unsigned char color)
 {
     unsigned long off = VRAM_MAP + (unsigned long)y * ROW_STRIDE + (unsigned int)x * 2;
-    VERA_ADDR_LO  = (unsigned char)(off);
+    VERA_ADDR_LO = (unsigned char)(off);
     VERA_ADDR_MID = (unsigned char)(off >> 8);
-    VERA_ADDR_HI  = ADDR_H_INC1;   /* bank=1 always, inc=1 for char+color pair */
+    VERA_ADDR_HI = ADDR_H_INC1; /* bank=1 always, inc=1 for char+color pair */
     VERA_DATA0 = ch;
     VERA_DATA0 = color;
 }
@@ -153,12 +162,14 @@ static void vera_put_char(int x, int y, unsigned char ch, unsigned char color)
 static void vera_clear_screen(void)
 {
     int x, y;
-    for (y = 0; y < screen_height; ++y) {
+    for (y = 0; y < screen_height; ++y)
+    {
         unsigned long row = VRAM_MAP + (unsigned long)y * ROW_STRIDE;
-        VERA_ADDR_LO  = (unsigned char)(row);
+        VERA_ADDR_LO = (unsigned char)(row);
         VERA_ADDR_MID = (unsigned char)(row >> 8);
-        VERA_ADDR_HI  = ADDR_H_INC1;
-        for (x = 0; x < screen_width; ++x) {
+        VERA_ADDR_HI = ADDR_H_INC1;
+        for (x = 0; x < screen_width; ++x)
+        {
             VERA_DATA0 = 32;
             VERA_DATA0 = COL_BLACK;
         }
@@ -215,37 +226,41 @@ static void update_matrix(void)
 
     done_thresh = (unsigned char)(screen_height + ZONE_TOTAL);
 
-    for (col = 0; col < screen_width; ++col) {
+    for (col = 0; col < screen_width; ++col)
+    {
 
-        if (!col_active[col]) {
-            if (fast_rand() < SPAWN_THRESH) {
-                col_head[col]   = 0;
+        if (!col_active[col])
+        {
+            if (fast_rand() < SPAWN_THRESH)
+            {
+                col_head[col] = 0;
                 col_active[col] = 1;
             }
             continue;
         }
 
-        for (step = 0; step < STEPS_PER_FRAME; ++step) {
+        for (step = 0; step < STEPS_PER_FRAME; ++step)
+        {
             column_step(col, (int)(unsigned char)col_head[col]);
             col_head[col]++;
-            if (col_head[col] >= done_thresh) {
+            if (col_head[col] >= done_thresh)
+            {
                 col_active[col] = 0;
                 break;
             }
         }
     }
-
 }
 
 /* ------------------------------------------------------------------ */
 
 int main(void)
 {
-    putchar(14);            /* lower/upper case character set */
+    putchar(14); /* lower/upper case character set */
     printf("VERA Matrix\n");
 
     vera_require();
-    vt_init();              /* text layer, scroll at 0, VERA_CTRL = 0 */
+    vt_init(); /* text layer, scroll at 0, VERA_CTRL = 0 */
     saved_border = DC_BORDER;
     setup_matrix_palette();
 
@@ -254,11 +269,12 @@ int main(void)
 
     /* Seed the LFSR from the jiffy clock and the CIA 1 timer */
     prng8 = RTCLOK_L ^ CIA1_TA_LO;
-    if (!prng8) prng8 = 0xA5;   /* LFSR must not be zero */
+    if (!prng8) prng8 = 0xA5; /* LFSR must not be zero */
 
     vera_clear_screen();
 
-    while (!kbhit()) {
+    while (!kbhit())
+    {
         wait_vbi();
         update_matrix();
     }

@@ -37,7 +37,7 @@
 #include "vtm.h"
 #include "vbm.h"
 
-#define N_BARS 4u
+#define N_BARS      4u
 #define SCREEN_COLS 40u
 
 /* KERNAL jiffy clock TIME ($A0-$A2), low byte: 60 Hz */
@@ -47,13 +47,13 @@
  * columns wide, up to BAR_ROWS rows tall, bottom on row BAR_BOTTOM. */
 #define VU_SCREEN  ((unsigned char *)0x0400)
 #define VU_COLOR   ((unsigned char *)0xD800)
-#define BAR_WIDTH   6u
-#define BAR_GAP     3u
-#define BAR_LEFT    ((SCREEN_COLS - (N_BARS * BAR_WIDTH + (N_BARS - 1) * BAR_GAP)) / 2)
-#define BAR_BOTTOM  23u
-#define BAR_ROWS    12u
-#define SC_BLOCK    0xA0    /* screen code: reverse space */
-#define SC_EMPTY    0x20    /* screen code: space */
+#define BAR_WIDTH  6u
+#define BAR_GAP    3u
+#define BAR_LEFT   ((SCREEN_COLS - (N_BARS * BAR_WIDTH + (N_BARS - 1) * BAR_GAP)) / 2)
+#define BAR_BOTTOM 23u
+#define BAR_ROWS   12u
+#define SC_BLOCK   0xA0 /* screen code: reverse space */
+#define SC_EMPTY   0x20 /* screen code: space */
 
 static const unsigned char bar_color[N_BARS] = {
     COLOR_LIGHTGREEN, COLOR_YELLOW, COLOR_LIGHTBLUE, COLOR_LIGHTRED
@@ -81,8 +81,8 @@ static void wait_vbi(void)
 /* ASCII (song and image names) to PETSCII for the lower/upper case set */
 static unsigned char ascii_to_petscii(unsigned char c)
 {
-    if (c >= 0x61 && c <= 0x7A) return (unsigned char)(c - 0x20);  /* a-z */
-    if (c >= 0x41 && c <= 0x5A) return (unsigned char)(c + 0x80);  /* A-Z */
+    if (c >= 0x61 && c <= 0x7A) return (unsigned char)(c - 0x20); /* a-z */
+    if (c >= 0x41 && c <= 0x5A) return (unsigned char)(c + 0x80); /* A-Z */
     if (c < 0x20 || c >= 0x7F) return '?';
     return c;
 }
@@ -93,7 +93,7 @@ static void print_centered(const unsigned char *text, unsigned char len)
 {
     unsigned char pad, i;
 
-    if (len > SCREEN_COLS) len = SCREEN_COLS;   /* clip, don't wrap */
+    if (len > SCREEN_COLS) len = SCREEN_COLS; /* clip, don't wrap */
     pad = (SCREEN_COLS - len) / 2;
 
     for (i = 0; i < pad; i++) cputc(' ');
@@ -110,7 +110,8 @@ static void draw_bar(unsigned char *filled, unsigned long loaded, unsigned long 
 {
     unsigned char target = (unsigned char)((loaded * SCREEN_COLS) / total);
     revers(1);
-    while (*filled < target && *filled < SCREEN_COLS - 1) {
+    while (*filled < target && *filled < SCREEN_COLS - 1)
+    {
         cputc(' ');
         (*filled)++;
     }
@@ -130,9 +131,10 @@ static void print_title(const void *song)
  * data (grows the bar). */
 static void load_progress(const void *song, unsigned long loaded, unsigned long total)
 {
-    if (!title_shown) {
+    if (!title_shown)
+    {
         print_title(song);
-        cputs("\r\n");   /* blank row between title and progress bar */
+        cputs("\r\n"); /* blank row between title and progress bar */
         title_shown = 1;
     }
     draw_bar(&bar_filled, loaded, total);
@@ -143,11 +145,12 @@ static void load_progress(const void *song, unsigned long loaded, unsigned long 
  * title above), then again per streamed chunk (grows its own bar, on its
  * own row below the song's). */
 static void image_progress(const char *name, unsigned char name_len,
-                            unsigned long loaded, unsigned long total)
+                           unsigned long loaded, unsigned long total)
 {
-    if (!img_bar_started) {
+    if (!img_bar_started)
+    {
         print_centered((const unsigned char *)name, name_len);
-        cputs("\r\n");   /* blank row between name and progress bar */
+        cputs("\r\n"); /* blank row between name and progress bar */
         img_bar_started = 1;
     }
     draw_bar(&img_bar_filled, loaded, total);
@@ -166,11 +169,13 @@ static void vu_draw(unsigned char ch, unsigned char rows)
     unsigned int off;
 
     if (rows == drawn_rows[ch]) return;
-    for (r = 0; r < BAR_ROWS; r++) {
+    for (r = 0; r < BAR_ROWS; r++)
+    {
         if ((r < rows) == (r < drawn_rows[ch])) continue;
         code = (r < rows) ? SC_BLOCK : SC_EMPTY;
         off = (BAR_BOTTOM - r) * SCREEN_COLS + BAR_LEFT + ch * (BAR_WIDTH + BAR_GAP);
-        for (x = 0; x < BAR_WIDTH; x++) {
+        for (x = 0; x < BAR_WIDTH; x++)
+        {
             VU_SCREEN[off + x] = code;
             VU_COLOR[off + x] = bar_color[ch];
         }
@@ -181,8 +186,9 @@ static void vu_draw(unsigned char ch, unsigned char rows)
 static void vu_init(void)
 {
     unsigned char ch;
-    for (ch = 0; ch < N_BARS; ch++) {
-        drawn_rows[ch] = BAR_ROWS;      /* force a full redraw */
+    for (ch = 0; ch < N_BARS; ch++)
+    {
+        drawn_rows[ch] = BAR_ROWS; /* force a full redraw */
         vu_draw(ch, 0);
     }
 }
@@ -190,13 +196,19 @@ static void vu_init(void)
 static void vu_tick(void)
 {
     unsigned char ch, lvl;
-    for (ch = 0; ch < N_BARS; ch++) {
+    for (ch = 0; ch < N_BARS; ch++)
+    {
         lvl = vtm_level(ch);
-        if (lvl >= displayed_level[ch]) {
+        if (lvl >= displayed_level[ch])
+        {
             displayed_level[ch] = lvl;
-        } else if (displayed_level[ch] > VU_FLOOR_LEVEL + VU_DECAY_STEP) {
+        }
+        else if (displayed_level[ch] > VU_FLOOR_LEVEL + VU_DECAY_STEP)
+        {
             displayed_level[ch] -= VU_DECAY_STEP;
-        } else {
+        }
+        else
+        {
             displayed_level[ch] = VU_FLOOR_LEVEL;
         }
         vu_draw(ch, level_rows(displayed_level[ch]));
@@ -205,17 +217,17 @@ static void vu_tick(void)
 
 /* Song and artwork are read from the drive the program was loaded from:
  * cc65 opens files on _curunit, the last device the KERNAL loaded from. */
-static const char song_path[]  = "demo.vtm";
+static const char song_path[] = "demo.vtm";
 static const char image_path[] = "demo.vbm";
 
 int main(void)
 {
     void *song;
-    int rval=0;
+    int rval = 0;
     unsigned char ch;
     unsigned char have_image;
 
-    putchar(14);             /* lower/upper case character set */
+    putchar(14); /* lower/upper case character set */
     bgcolor(COLOR_BLACK);
     bordercolor(COLOR_BLACK);
     textcolor(COLOR_WHITE);
@@ -223,20 +235,22 @@ int main(void)
 
     vera_require();
 
-    _filetype = 'p';         /* the data files are PRG files on the disk */
+    _filetype = 'p'; /* the data files are PRG files on the disk */
 
     song = vtm_load_file(song_path, load_progress);
-    if (!song) {
+    if (!song)
+    {
         cprintf("\r\nerror: could not load %s\r\n", song_path);
-        rval=1;
+        rval = 1;
         goto err;
     }
-    cputs("\r\n\r\n");       /* move past the progress bar row */
+    cputs("\r\n\r\n"); /* move past the progress bar row */
 
-    if (!vtm_init(song)) {
+    if (!vtm_init(song))
+    {
         cputs("error: demo.vtm is not a valid VTM3 file\r\n");
         free(song);
-        rval=1;
+        rval = 1;
         goto err;
     }
 
@@ -246,8 +260,9 @@ int main(void)
      * while the song plays. If it's missing, playback proceeds exactly as
      * before with no VERA display-mode change at all. */
     have_image = vbm_load_file(image_path, image_progress);
-    if (have_image) {
-        cputs("\r\n\r\n");   /* move past the image progress bar row */
+    if (have_image)
+    {
+        cputs("\r\n\r\n"); /* move past the image progress bar row */
         vbm_init();
     }
 
@@ -256,12 +271,13 @@ int main(void)
 
     while (kbhit()) cgetc();
     vu_init();
-    while (!kbhit()) {
+    while (!kbhit())
+    {
         wait_vbi();
         vtm_tick();
         vu_tick();
     }
-    cgetc();                 /* the key that stopped playback */
+    cgetc(); /* the key that stopped playback */
 
     if (have_image) vbm_done();
 

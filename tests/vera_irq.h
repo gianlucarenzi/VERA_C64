@@ -22,10 +22,10 @@
  * that is in the middle of a VRAM access sequence.
  */
 
-#define VERA_IRQ_VSYNC   0x01
-#define VERA_IRQ_LINE    0x02
-#define VERA_IRQ_SPRCOL  0x04
-#define VERA_IRQ_AFLOW   0x08
+#define VERA_IRQ_VSYNC  0x01
+#define VERA_IRQ_LINE   0x02
+#define VERA_IRQ_SPRCOL 0x04
+#define VERA_IRQ_AFLOW  0x08
 
 /* Install the hook (idempotent).  Does not enable any VERA IRQ. */
 void vera_irq_install(void);

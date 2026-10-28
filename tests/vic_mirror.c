@@ -15,24 +15,26 @@
 #include <stdio.h>
 #include <string.h>
 
+/* clang-format off */
 #pragma charmap (0x56, 0x56)
 #include "../include/vera_detect.h"
 #pragma charmap (0x56, 0xD6)
+/* clang-format on */
 #include "../include/vera.h"
 
 /* VIC-II screen and cursor position */
-#define VIC_SCREEN  ((unsigned char *)0x0400)
-#define VIC_COLS    40
-#define VIC_ROWS    25
+#define VIC_SCREEN ((unsigned char *)0x0400)
+#define VIC_COLS   40
+#define VIC_ROWS   25
 
 /* VERA layer 1 in bank 1 */
-#define VERA_MAP_BASE   0x00000
-#define VERA_COLS       40
-#define VERA_ROWS       30
+#define VERA_MAP_BASE 0x00000
+#define VERA_COLS     40
+#define VERA_ROWS     30
 
 /* KERNAL cursor position */
-#define PNTR  (*(volatile unsigned char *)0xD3)
-#define TBLX  (*(volatile unsigned char *)0xD6)
+#define PNTR (*(volatile unsigned char *)0xD3)
+#define TBLX (*(volatile unsigned char *)0xD6)
 
 static unsigned char last_pntr = 0;
 static unsigned char last_tblx = 0;
@@ -67,15 +69,19 @@ static void mirror_screen_full(void)
     unsigned char row;
     unsigned char col;
 
-    for (row = 0; row < VIC_ROWS; row++) {
-        for (col = 0; col < VIC_COLS; col++) {
+    for (row = 0; row < VIC_ROWS; row++)
+    {
+        for (col = 0; col < VIC_COLS; col++)
+        {
             mirror_cell(row, col);
         }
     }
 
     /* Clear bottom rows */
-    for (row = VIC_ROWS; row < VERA_ROWS; row++) {
-        for (col = 0; col < VIC_COLS; col++) {
+    for (row = VIC_ROWS; row < VERA_ROWS; row++)
+    {
+        for (col = 0; col < VIC_COLS; col++)
+        {
             vera_write_cell(row, col, ' ', 0x0F);
         }
     }
@@ -124,10 +130,13 @@ int main(void)
     last_tblx = TBLX;
 
     /* Main loop */
-    for (;;) {
+    for (;;)
+    {
         /* Check if cursor moved */
-        if (PNTR != last_pntr || TBLX != last_tblx) {
-            if (last_tblx < VIC_ROWS && last_pntr < VIC_COLS) {
+        if (PNTR != last_pntr || TBLX != last_tblx)
+        {
+            if (last_tblx < VIC_ROWS && last_pntr < VIC_COLS)
+            {
                 mirror_cell(last_tblx, last_pntr);
             }
             mirror_cursor();
@@ -135,16 +144,19 @@ int main(void)
             last_tblx = TBLX;
         }
 
-        if (kbhit()) {
+        if (kbhit())
+        {
             k = cgetc();
-            if (k == 3) {  /* RUN/STOP */
+            if (k == 3) /* RUN/STOP */
+            {
                 break;
             }
             /* Mirror printed character */
             new_row = TBLX;
             new_col = PNTR;
             if (new_col > 0) new_col--;
-            if (new_row < VIC_ROWS && new_col < VIC_COLS) {
+            if (new_row < VIC_ROWS && new_col < VIC_COLS)
+            {
                 mirror_cell(new_row, new_col);
                 mirror_cursor();
             }

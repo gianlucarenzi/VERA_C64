@@ -23,7 +23,7 @@ void vbm_done(void);
  * loaded/total updated (name/name_len still passed, unchanged, so callers
  * that only care about progress can ignore the first two arguments). */
 typedef void (*vbm_progress_cb)(const char *name, unsigned char name_len,
-                                 unsigned long loaded, unsigned long total);
+                                unsigned long loaded, unsigned long total);
 
 /* vbm_load_file() — stream a compiled .vbm file's palette and 320x240 8bpp
  * pixel data straight into VRAM (no full-file buffering: at most a few

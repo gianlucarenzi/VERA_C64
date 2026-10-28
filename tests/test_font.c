@@ -16,7 +16,7 @@ int main(void)
     int i;
     unsigned int id;
 
-    putchar(14);            /* lower/upper case character set */
+    putchar(14); /* lower/upper case character set */
     id = vera_require();
     printf("VERA detected (ID: 0x%04X)\n", id);
     printf("Character test loop on the VERA\n");
@@ -24,8 +24,10 @@ int main(void)
 
     vt_init();
     vt_puts("VERA detected, character test loop. Press a key to exit.\n");
-    while (1) {
-        for (i = 0; i < 256; i++) {
+    while (1)
+    {
+        for (i = 0; i < 256; i++)
+        {
             vt_glyph((unsigned char)i);
             if (kbhit())
                 goto done;

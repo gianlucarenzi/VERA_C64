@@ -14,8 +14,8 @@
 #include "vtext.h"
 
 /* seed: KERNAL jiffy clock and CIA 1 timer A, low bytes */
-#define RTCLOK_L       (*(volatile unsigned char *)0x00A2)
-#define CIA1_TA_LO     (*(volatile unsigned char *)0xDC04)
+#define RTCLOK_L   (*(volatile unsigned char *)0x00A2)
+#define CIA1_TA_LO (*(volatile unsigned char *)0xDC04)
 
 /* 8-bit Galois LFSR, x^8+x^6+x^5+x^2+1 (as in test_matrix.c) */
 static unsigned char prng8;
@@ -35,7 +35,7 @@ int main(void)
     int counter = VT_COLS * 25;
     unsigned int id;
 
-    putchar(14);            /* lower/upper case character set */
+    putchar(14); /* lower/upper case character set */
     id = vera_require();
     printf("VERA detected (ID: 0x%04X)\n", id);
     printf("Maze test loop on the VERA\n");
@@ -43,7 +43,7 @@ int main(void)
     srand(12345);
 
     prng8 = RTCLOK_L ^ CIA1_TA_LO;
-    if (!prng8) prng8 = 0xA5;   /* LFSR must not be zero */
+    if (!prng8) prng8 = 0xA5; /* LFSR must not be zero */
 
     vt_init();
 

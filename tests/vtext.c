@@ -8,13 +8,13 @@
 /* the fonts of the Atari driver, in ATASCII order (vtfont.s) */
 extern const unsigned char vt_font[];
 
-unsigned char vt_top;               /* first tilemap row on the screen */
-static unsigned char cur_x, cur_y;  /* cursor on the screen */
+unsigned char vt_top;              /* first tilemap row on the screen */
+static unsigned char cur_x, cur_y; /* cursor on the screen */
 
 /* point DATA0 at column x of tilemap row r, increment 1 */
 static void __fastcall__ set_cell(unsigned char x, unsigned char r)
 {
-    VERA_CTRL   = 0;
+    VERA_CTRL = 0;
     VERA_ADDR_L = (unsigned char)(x << 1);
     VERA_ADDR_M = (unsigned char)(0xB0 + (r & (VT_MAP_ROWS - 1)));
     VERA_ADDR_H = VERA_INC1 | 1;
@@ -25,7 +25,8 @@ static void __fastcall__ clear_row(unsigned char r)
     unsigned char x;
 
     set_cell(0, r);
-    for (x = 0; x < VT_COLS; ++x) {
+    for (x = 0; x < VT_COLS; ++x)
+    {
         VERA_DATA0 = 0x20;
         VERA_DATA0 = VT_COLOR;
     }
@@ -35,7 +36,7 @@ static void set_vscroll(void)
 {
     unsigned int v = (unsigned int)vt_top * VT_TILE_HEIGHT;
 
-    VERA_CTRL      = 0;
+    VERA_CTRL = 0;
     VERA_L1_VSCR_L = (unsigned char)v;
     VERA_L1_VSCR_H = (unsigned char)(v >> 8);
 }
@@ -55,8 +56,8 @@ void vt_init(void)
 {
     unsigned int i;
 
-    VERA_CTRL      = 0;                         /* DCSEL 0 */
-    VERA_DC_VIDEO  = 0x21;                      /* VGA, layer 1 only */
+    VERA_CTRL = 0;        /* DCSEL 0 */
+    VERA_DC_VIDEO = 0x21; /* VGA, layer 1 only */
 #if VT_MODE == 4
     VERA_DC_HSCALE = 0x40;
     VERA_DC_VSCALE = 0x40;
@@ -65,12 +66,12 @@ void vt_init(void)
     VERA_DC_VSCALE = 0x80;
 #endif
     VERA_DC_BORDER = 0;
-    VERA_L1_CONFIG   = 0x60;                    /* 128x64 tiles, 1 bpp text */
-    VERA_L1_MAPBASE  = (unsigned char)(VT_MAP >> 9);
+    VERA_L1_CONFIG = 0x60; /* 128x64 tiles, 1 bpp text */
+    VERA_L1_MAPBASE = (unsigned char)(VT_MAP >> 9);
 #if VT_TILE_HEIGHT == 16
-    VERA_L1_TILEBASE = (unsigned char)(VT_FONT >> 9) | 2;  /* 8x16 tiles */
+    VERA_L1_TILEBASE = (unsigned char)(VT_FONT >> 9) | 2; /* 8x16 tiles */
 #else
-    VERA_L1_TILEBASE = (unsigned char)(VT_FONT >> 9);      /* 8x8 tiles */
+    VERA_L1_TILEBASE = (unsigned char)(VT_FONT >> 9); /* 8x8 tiles */
 #endif
     VERA_L1_HSCR_L = 0;
     VERA_L1_HSCR_H = 0;
@@ -85,7 +86,8 @@ void vt_init(void)
 static void newline(void)
 {
     cur_x = 0;
-    if (cur_y < VT_ROWS - 1) {
+    if (cur_y < VT_ROWS - 1)
+    {
         ++cur_y;
         return;
     }
@@ -108,15 +110,16 @@ void __fastcall__ vt_putc(char c)
 {
     unsigned char a = (unsigned char)c;
 
-    if (c == '\n') {
+    if (c == '\n')
+    {
         newline();
         return;
     }
     /* cc65 c64 strings are PETSCII: back to ASCII */
     if (a >= 0x41 && a <= 0x5A)
-        a += 0x20;                  /* a-z */
+        a += 0x20; /* a-z */
     else if (a >= 0xC1 && a <= 0xDA)
-        a -= 0x80;                  /* A-Z */
+        a -= 0x80; /* A-Z */
     vt_glyph(a);
 }
 

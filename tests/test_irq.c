@@ -20,11 +20,11 @@
 #include "detect.h"
 #include "vera_irq.h"
 
-#define CINV     (*(volatile unsigned int *)0x0314)
+#define CINV (*(volatile unsigned int *)0x0314)
 /* KERNAL jiffy clock TIME ($A0-$A2), low byte: 60 Hz on PAL and NTSC */
-#define JIFFY    (*(volatile unsigned char *)0x00A2)
+#define JIFFY (*(volatile unsigned char *)0x00A2)
 
-#define MEASURE_JIFFIES 120u   /* ~2 s */
+#define MEASURE_JIFFIES 120u /* ~2 s */
 
 static unsigned char g_pass = 0;
 static unsigned char g_fail = 0;
@@ -71,7 +71,7 @@ static unsigned int expected_events(unsigned char jiffies)
 
 static unsigned char near_enough(unsigned int got, unsigned int exp)
 {
-    unsigned int tol = exp / 20u + 1u;   /* 5 % + 1 */
+    unsigned int tol = exp / 20u + 1u; /* 5 % + 1 */
     return got + tol >= exp && got <= exp + tol;
 }
 
@@ -81,7 +81,7 @@ int main(void)
     unsigned int exp, got;
     unsigned int old_vec;
 
-    putchar(14);            /* lower/upper case character set */
+    putchar(14); /* lower/upper case character set */
     vera_require();
 
     printf("VERA IRQ hook test\n");

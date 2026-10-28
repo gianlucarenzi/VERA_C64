@@ -33,10 +33,10 @@
 #define VT_TILE_HEIGHT 16
 #endif
 
-#define VT_MAP         0x1B000ul    /* tilemap, 256 bytes per row */
-#define VT_MAP_ROWS    64
-#define VT_FONT        0x1F000ul    /* 128 glyphs */
-#define VT_COLOR       0x61         /* bg 6 (blue), fg 1 (white) */
+#define VT_MAP      0x1B000ul /* tilemap, 256 bytes per row */
+#define VT_MAP_ROWS 64
+#define VT_FONT     0x1F000ul /* 128 glyphs */
+#define VT_COLOR    0x61      /* bg 6 (blue), fg 1 (white) */
 
 /* Set up layer 1 as text, load the font, clear the screen. */
 void vt_init(void);

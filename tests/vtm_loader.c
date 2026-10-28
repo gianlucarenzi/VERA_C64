@@ -20,12 +20,12 @@
 #include <string.h>
 #include "vtm.h"
 
-#define HEADER_SIZE        13u   /* magic(4) + n_channels + frames_per_row +
+#define HEADER_SIZE       13u /* magic(4) + n_channels + frames_per_row +
                                    * n_instruments + n_patterns + order_len +
                                    * loop_pos + reserved(2) + title_len */
-#define INSTR_SIZE          3u
-#define PATTBL_ENTRY_SIZE   3u
-#define READ_CHUNK        512u   /* just I/O granularity now — no longer tied
+#define INSTR_SIZE        3u
+#define PATTBL_ENTRY_SIZE 3u
+#define READ_CHUNK        512u /* just I/O granularity now — no longer tied
                                    * to any EOF-detection concern, since every
                                    * read is bounded by a known target size */
 
@@ -41,25 +41,32 @@ void *vtm_load_file(const char *filename, vtm_progress_cb progress)
     f = fopen(filename, "rb");
     if (!f) return NULL;
 
-    if (fread(hdr, 1, HEADER_SIZE, f) != HEADER_SIZE) { fclose(f); return NULL; }
+    if (fread(hdr, 1, HEADER_SIZE, f) != HEADER_SIZE)
+    {
+        fclose(f);
+        return NULL;
+    }
     /* "VTM3" in ASCII (cc65 c64 character constants are PETSCII) */
-    if (hdr[0] != 0x56 || hdr[1] != 0x54 || hdr[2] != 0x4D || hdr[3] != 0x33) {
+    if (hdr[0] != 0x56 || hdr[1] != 0x54 || hdr[2] != 0x4D || hdr[3] != 0x33)
+    {
         fclose(f);
         return NULL;
     }
 
-    n_channels    = hdr[4];
+    n_channels = hdr[4];
     n_instruments = hdr[6];
-    n_patterns    = hdr[7];
-    order_len     = hdr[8];
-    title_len     = hdr[12];
+    n_patterns = hdr[7];
+    order_len = hdr[8];
+    title_len = hdr[12];
 
-    prefix_size = (unsigned long)HEADER_SIZE + title_len + order_len
-                + (unsigned long)n_instruments * INSTR_SIZE
-                + (unsigned long)n_patterns * PATTBL_ENTRY_SIZE;
+    prefix_size = (unsigned long)HEADER_SIZE + title_len + order_len + (unsigned long)n_instruments * INSTR_SIZE + (unsigned long)n_patterns * PATTBL_ENTRY_SIZE;
 
     buf = malloc(prefix_size);
-    if (!buf) { fclose(f); return NULL; }
+    if (!buf)
+    {
+        fclose(f);
+        return NULL;
+    }
     memcpy(buf, hdr, HEADER_SIZE);
 
     /* Loop on got == 0, not "got < want": fread() may return fewer bytes
@@ -69,10 +76,16 @@ void *vtm_load_file(const char *filename, vtm_progress_cb progress)
      * never exceeds the known prefix_size, a zero read really is an
      * unexpected truncated-file error). */
     len = HEADER_SIZE;
-    while (len < prefix_size) {
+    while (len < prefix_size)
+    {
         want = prefix_size - len;
         got = fread(buf + len, 1, want, f);
-        if (got == 0) { free(buf); fclose(f); return NULL; }
+        if (got == 0)
+        {
+            free(buf);
+            fclose(f);
+            return NULL;
+        }
         len += got;
     }
 
@@ -81,7 +94,8 @@ void *vtm_load_file(const char *filename, vtm_progress_cb progress)
      * the furthest byte any pattern's data reaches. */
     pt_off = HEADER_SIZE + title_len + order_len + (unsigned)n_instruments * INSTR_SIZE;
     total_size = prefix_size;
-    for (i = 0; i < n_patterns; i++) {
+    for (i = 0; i < n_patterns; i++)
+    {
         unsigned char *e = buf + pt_off + i * PATTBL_ENTRY_SIZE;
         unsigned n_rows = e[0];
         unsigned long data_offset = e[1] | ((unsigned long)e[2] << 8);
@@ -90,16 +104,27 @@ void *vtm_load_file(const char *filename, vtm_progress_cb progress)
     }
 
     grown = realloc(buf, total_size);
-    if (!grown) { free(buf); fclose(f); return NULL; }
+    if (!grown)
+    {
+        free(buf);
+        fclose(f);
+        return NULL;
+    }
     buf = grown;
 
-    if (progress) progress(buf, len, total_size);   /* title is valid now */
+    if (progress) progress(buf, len, total_size); /* title is valid now */
 
-    while (len < total_size) {
+    while (len < total_size)
+    {
         want = total_size - len;
         if (want > READ_CHUNK) want = READ_CHUNK;
         got = fread(buf + len, 1, want, f);
-        if (got == 0) { free(buf); fclose(f); return NULL; }
+        if (got == 0)
+        {
+            free(buf);
+            fclose(f);
+            return NULL;
+        }
         len += got;
         if (progress) progress(buf, len, total_size);
     }

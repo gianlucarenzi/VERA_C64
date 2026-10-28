@@ -20,26 +20,26 @@
 #include "detect.h"
 
 /* CTRL DCSEL field values (bits [6:1]) */
-#define DCSEL_0   0x00   /* DC_VIDEO … DC_BORDER      (owned by VERA.SYS) */
-#define DCSEL_1   0x02   /* DC_HSTART … DC_VSTOP                          */
-#define DCSEL_2   0x04   /* FX_CTRL, FX_TILEBASE, FX_MAPBASE, FX_MULT     */
-#define DCSEL_3   0x06   /* FX_X_INCR_L/H, FX_Y_INCR_L/H                  */
-#define DCSEL_4   0x08   /* FX_X/Y_POS_L/H (integer part)                  */
-#define DCSEL_5   0x0A   /* FX_X/Y_POS_S (subpixel), FX_POLY_FILL_L/H     */
-#define DCSEL_6   0x0C   /* FX cache bytes / accumulator side-effects       */
+#define DCSEL_0 0x00 /* DC_VIDEO … DC_BORDER      (owned by VERA.SYS) */
+#define DCSEL_1 0x02 /* DC_HSTART … DC_VSTOP                          */
+#define DCSEL_2 0x04 /* FX_CTRL, FX_TILEBASE, FX_MAPBASE, FX_MULT     */
+#define DCSEL_3 0x06 /* FX_X_INCR_L/H, FX_Y_INCR_L/H                  */
+#define DCSEL_4 0x08 /* FX_X/Y_POS_L/H (integer part)                  */
+#define DCSEL_5 0x0A /* FX_X/Y_POS_S (subpixel), FX_POLY_FILL_L/H     */
+#define DCSEL_6 0x0C /* FX cache bytes / accumulator side-effects       */
 
 /* FX_CTRL bitmasks */
-#define FX_TRANSP          0x80
-#define FX_CACHE_WR_EN     0x40
-#define FX_CACHE_FILL_EN   0x20
-#define FX_ONE_BYTE_CACHE  0x10
-#define FX_16BIT_HOP       0x08
-#define FX_4BIT_MODE       0x04
+#define FX_TRANSP         0x80
+#define FX_CACHE_WR_EN    0x40
+#define FX_CACHE_FILL_EN  0x20
+#define FX_ONE_BYTE_CACHE 0x10
+#define FX_16BIT_HOP      0x08
+#define FX_4BIT_MODE      0x04
 
 /* A read of DATA0 for its side effects only (cache fill).  cc65 -O drops
  * a read whose value is discarded, even of a volatile register or into a
  * volatile local, and even an inline "lda": BIT survives the optimizer. */
-#define READ_DATA0() __asm__ ("bit %w", (unsigned)(VERA_BASE + 3))
+#define READ_DATA0() __asm__("bit %w", (unsigned)(VERA_BASE + 3))
 
 /* C64 KERNAL jiffy clock TIME ($A0-$A2, big endian), 60 Hz */
 #define RTCLOK_M (*(volatile unsigned char *)0x00A1)
@@ -47,10 +47,10 @@
 
 /* Safe VRAM window for testing: 64 KB in bank 0 */
 #define TEST_VRAM_SRC   0x00000UL
-#define TEST_VRAM_DST   0x08000UL   /* 32768 is 4-byte aligned (0x8000 % 4 == 0) */
-#define TEST_VRAM_MULT  0x00100UL   /* 4-byte area for multiplier test    */
-#define TEST_VRAM_TRANS 0x00110UL   /* 1-byte area for transparency test  */
-#define BENCH_SIZE      16384       /* 16 KB for benchmarking             */
+#define TEST_VRAM_DST   0x08000UL /* 32768 is 4-byte aligned (0x8000 % 4 == 0) */
+#define TEST_VRAM_MULT  0x00100UL /* 4-byte area for multiplier test    */
+#define TEST_VRAM_TRANS 0x00110UL /* 1-byte area for transparency test  */
+#define BENCH_SIZE      16384     /* 16 KB for benchmarking             */
 
 static unsigned long g_start_time;
 
@@ -58,7 +58,8 @@ static void start_timer(void)
 {
     /* Wait for frame start to maximize resolution */
     unsigned char start = RTCLOK_L;
-    while (start == RTCLOK_L);
+    while (start == RTCLOK_L)
+        ;
     g_start_time = ((unsigned long)RTCLOK_M << 8) | RTCLOK_L;
 }
 
@@ -103,12 +104,12 @@ static void check_b(const char *name, unsigned char got, unsigned char expected)
 /* ------------------------------------------------------------------ */
 
 /* ADDR_H auto-increment: bits[7:4]; bank in bit[0] */
-#define ADDR_H_NOINC_B0  0x00   /* bank=0, no increment    */
-#define ADDR_H_INC1_B0   0x10   /* bank=0, +1 per access   */
+#define ADDR_H_NOINC_B0 0x00 /* bank=0, no increment    */
+#define ADDR_H_INC1_B0  0x10 /* bank=0, +1 per access   */
 
 static void set_addr0(unsigned long addr, unsigned char addr_h)
 {
-    VERA_CTRL  = DCSEL_0;   /* ADDRSEL=0, DCSEL=0 */
+    VERA_CTRL = DCSEL_0; /* ADDRSEL=0, DCSEL=0 */
     VERA_ADDR_L = (unsigned char)(addr & 0xFF);
     VERA_ADDR_M = (unsigned char)((addr >> 8) & 0xFF);
     VERA_ADDR_H = addr_h;
@@ -135,7 +136,7 @@ static void test_fx_ctrl(void)
 
     g_section = "[2]";
 
-    VERA_CTRL  = DCSEL_2;
+    VERA_CTRL = DCSEL_2;
     /* transparency=1, 4bit=1, mode=NORMAL → 0x84 */
     VERA_REG09 = 0x84;
     v = VERA_REG09;
@@ -156,7 +157,7 @@ static void test_fx_ctrl(void)
 /* 47.0.2, 'V',48,0,1 on 48.0.1).  Writes are exercised as a smoke      */
 /* test; their effect is verified by the behavioural tests below.       */
 /* ------------------------------------------------------------------ */
-static unsigned char g_id[4];   /* DCSEL 63 identity: 'V', major, minor, build */
+static unsigned char g_id[4]; /* DCSEL 63 identity: 'V', major, minor, build */
 
 static void check_wo(unsigned char dcsel, const char *tag,
                      unsigned char r09, unsigned char r0a,
@@ -180,42 +181,63 @@ static void test_write_only(void)
     g_id[2] = VERA_REG0B;
     g_id[3] = VERA_REG0C;
     VERA_CTRL = DCSEL_0;
-    check_b("DC63 'V'", g_id[0], 0x56);     /* 'V' in ASCII, not PETSCII */
+    check_b("DC63 'V'", g_id[0], 0x56); /* 'V' in ASCII, not PETSCII */
     check_b("DC63 major >= 47", g_id[1] >= 47 ? g_id[1] : 0, g_id[1]);
     printf("VERA firmware %u.%u.%u\n",
            (unsigned int)g_id[1], (unsigned int)g_id[2], (unsigned int)g_id[3]);
 
     /* DCSEL=2: only $09 (FX_CTRL) is readable */
-    VERA_CTRL  = DCSEL_2;
+    VERA_CTRL = DCSEL_2;
     VERA_REG0A = 0xFD;
     VERA_REG0B = 0x93;
     VERA_REG0C = 0x3D;
     check_wo(DCSEL_2, "DC2 $0A/$0B/$0C", 0, 1, 1, 1);
-    VERA_CTRL = DCSEL_2; VERA_REG0A = 0; VERA_REG0B = 0; VERA_REG0C = 0;
+    VERA_CTRL = DCSEL_2;
+    VERA_REG0A = 0;
+    VERA_REG0B = 0;
+    VERA_REG0C = 0;
 
     /* DCSEL=3 INCR */
     VERA_CTRL = DCSEL_3;
-    VERA_REG09 = 0x34; VERA_REG0A = 0x01; VERA_REG0B = 0xAB; VERA_REG0C = 0x82;
+    VERA_REG09 = 0x34;
+    VERA_REG0A = 0x01;
+    VERA_REG0B = 0xAB;
+    VERA_REG0C = 0x82;
     check_wo(DCSEL_3, "DC3 INCR", 1, 1, 1, 1);
     VERA_CTRL = DCSEL_3;
-    VERA_REG09 = 0; VERA_REG0A = 0; VERA_REG0B = 0; VERA_REG0C = 0;
+    VERA_REG09 = 0;
+    VERA_REG0A = 0;
+    VERA_REG0B = 0;
+    VERA_REG0C = 0;
 
     /* DCSEL=4 POS integer */
     VERA_CTRL = DCSEL_4;
-    VERA_REG09 = 0x50; VERA_REG0A = 0x02; VERA_REG0B = 0xC0; VERA_REG0C = 0x85;
+    VERA_REG09 = 0x50;
+    VERA_REG0A = 0x02;
+    VERA_REG0B = 0xC0;
+    VERA_REG0C = 0x85;
     check_wo(DCSEL_4, "DC4 POS", 1, 1, 1, 1);
     VERA_CTRL = DCSEL_4;
-    VERA_REG09 = 0; VERA_REG0A = 0; VERA_REG0B = 0; VERA_REG0C = 0;
+    VERA_REG09 = 0;
+    VERA_REG0A = 0;
+    VERA_REG0B = 0;
+    VERA_REG0C = 0;
 
     /* DCSEL=5: $09/$0A readable as identity; $0B/$0C = POLY_FILL (live) */
     VERA_CTRL = DCSEL_5;
-    VERA_REG09 = 0x3C; VERA_REG0A = 0x3C;
+    VERA_REG09 = 0x3C;
+    VERA_REG0A = 0x3C;
     check_wo(DCSEL_5, "DC5 POS_S", 1, 1, 0, 0);
-    VERA_CTRL = DCSEL_5; VERA_REG09 = 0; VERA_REG0A = 0;
+    VERA_CTRL = DCSEL_5;
+    VERA_REG09 = 0;
+    VERA_REG0A = 0;
 
     /* DCSEL=6 cache: reads of $09/$0A have side effects but return identity */
     VERA_CTRL = DCSEL_6;
-    VERA_REG09 = 0xAA; VERA_REG0A = 0xBB; VERA_REG0B = 0xCC; VERA_REG0C = 0xDD;
+    VERA_REG09 = 0xAA;
+    VERA_REG0A = 0xBB;
+    VERA_REG0B = 0xCC;
+    VERA_REG0C = 0xDD;
     check_wo(DCSEL_6, "DC6 CACHE", 1, 1, 1, 1);
 
     VERA_CTRL = DCSEL_0;
@@ -240,25 +262,25 @@ static void test_multiplier(void)
     VERA_DATA0 = 0xFF;
 
     /* FX_CTRL: cache_write_enabled=1, all others 0 → 0x40 */
-    VERA_CTRL  = DCSEL_2;
+    VERA_CTRL = DCSEL_2;
     VERA_REG09 = 0x40;
 
     /* FX_MULT: bit7=ResetAccum resets accumulator to 0; bit4=mult_enabled → 0x90 */
     VERA_REG0C = 0x90;
 
     /* Cache: A=3 (low word), B=4 (high word) */
-    VERA_CTRL  = DCSEL_6;
-    VERA_REG09 = 0x03;   /* cache[0] = A_lo */
-    VERA_REG0A = 0x00;   /* cache[1] = A_hi */
-    VERA_REG0B = 0x04;   /* cache[2] = B_lo */
-    VERA_REG0C = 0x00;   /* cache[3] = B_hi */
+    VERA_CTRL = DCSEL_6;
+    VERA_REG09 = 0x03; /* cache[0] = A_lo */
+    VERA_REG0A = 0x00; /* cache[1] = A_hi */
+    VERA_REG0B = 0x04; /* cache[2] = B_lo */
+    VERA_REG0C = 0x00; /* cache[3] = B_hi */
 
     /* Write triggers vera_fx_write_data: 3*4=12 stored as 4-byte LE */
     set_addr0(TEST_VRAM_MULT, ADDR_H_NOINC_B0);
     VERA_DATA0 = 0x00;
 
     /* Disable cache-write mode before reading back */
-    VERA_CTRL  = DCSEL_2;
+    VERA_CTRL = DCSEL_2;
     VERA_REG09 = 0x00;
     VERA_REG0C = 0x00;
 
@@ -269,12 +291,12 @@ static void test_multiplier(void)
     r2 = VERA_DATA0;
     r3 = VERA_DATA0;
 
-    VERA_CTRL    = DCSEL_0;
+    VERA_CTRL = DCSEL_0;
 
     check_b("VRAM+0 = 0x0C (3*4)", r0, 0x0C);
-    check_b("VRAM+1 = 0x00",       r1, 0x00);
-    check_b("VRAM+2 = 0x00",       r2, 0x00);
-    check_b("VRAM+3 = 0x00",       r3, 0x00);
+    check_b("VRAM+1 = 0x00", r1, 0x00);
+    check_b("VRAM+2 = 0x00", r2, 0x00);
+    check_b("VRAM+3 = 0x00", r3, 0x00);
 }
 
 /* ------------------------------------------------------------------ */
@@ -287,14 +309,14 @@ static void test_transparency(void)
     g_section = "[10]";
 
     /* Write sentinel 0x55 with transparency disabled */
-    VERA_CTRL  = DCSEL_2;
+    VERA_CTRL = DCSEL_2;
     VERA_REG09 = 0x00;
     vram_write(TEST_VRAM_TRANS, 0x55);
     v = vram_read(TEST_VRAM_TRANS);
     check_b("sentinel 0x55 written", v, 0x55);
 
     /* Enable transparency: FX_CTRL bit7=1 */
-    VERA_CTRL  = DCSEL_2;
+    VERA_CTRL = DCSEL_2;
     VERA_REG09 = 0x80;
 
     /* Write 0x00 — must be skipped */
@@ -308,9 +330,9 @@ static void test_transparency(void)
     check_b("non-zero 0xAA written", v, 0xAA);
 
     /* Restore */
-    VERA_CTRL    = DCSEL_2;
-    VERA_REG09   = 0x00;
-    VERA_CTRL    = DCSEL_0;
+    VERA_CTRL = DCSEL_2;
+    VERA_REG09 = 0x00;
+    VERA_CTRL = DCSEL_0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -323,20 +345,20 @@ static void test_cache_manual(void)
     g_section = "[11]";
 
     /* 1. Load cache manually via DCSEL_6 */
-    VERA_CTRL  = DCSEL_6;
+    VERA_CTRL = DCSEL_6;
     VERA_REG09 = 0xDE;
     VERA_REG0A = 0xAD;
     VERA_REG0B = 0xBE;
     VERA_REG0C = 0xEF;
 
     /* 2. Setup DST address, INC4, ADDRSEL=1 */
-    VERA_CTRL  = 0x01; /* ADDRSEL=1, DCSEL=0 */
+    VERA_CTRL = 0x01; /* ADDRSEL=1, DCSEL=0 */
     VERA_ADDR_L = (unsigned char)(TEST_VRAM_DST & 0xFF);
     VERA_ADDR_M = (unsigned char)((TEST_VRAM_DST >> 8) & 0xFF);
     VERA_ADDR_H = VERA_INC4 | (unsigned char)((TEST_VRAM_DST >> 16) & 0x01);
 
     /* 3. Enable Cache Write */
-    VERA_CTRL  = DCSEL_2;
+    VERA_CTRL = DCSEL_2;
     VERA_REG09 = FX_CACHE_WR_EN;
 
     /* 4. Flush cache to VRAM */
@@ -369,7 +391,7 @@ static void test_cache_copy(void)
     vram_write(TEST_VRAM_SRC + 1, 0xB2);
     vram_write(TEST_VRAM_SRC + 2, 0xC3);
     vram_write(TEST_VRAM_SRC + 3, 0xD4);
-    
+
     /* Clear destination */
     vram_write(TEST_VRAM_DST + 0, 0x00);
     vram_write(TEST_VRAM_DST + 1, 0x00);
@@ -377,20 +399,20 @@ static void test_cache_copy(void)
     vram_write(TEST_VRAM_DST + 3, 0x00);
 
     /* 1. Reset Cache Index to 0 via FX_MULT (bits 3:2 = 00) */
-    VERA_CTRL  = DCSEL_2;
-    VERA_REG0C = 0x00; 
-    
+    VERA_CTRL = DCSEL_2;
+    VERA_REG0C = 0x00;
+
     /* 2. Enable FX Cache Fill and Write */
     VERA_REG09 = FX_CACHE_FILL_EN | FX_CACHE_WR_EN;
 
     /* 3. Set ADDR0 to source, INC1 */
-    VERA_CTRL  = DCSEL_0;   /* ADDRSEL=0 */
+    VERA_CTRL = DCSEL_0; /* ADDRSEL=0 */
     VERA_ADDR_L = (unsigned char)(TEST_VRAM_SRC & 0xFF);
     VERA_ADDR_M = (unsigned char)((TEST_VRAM_SRC >> 8) & 0xFF);
     VERA_ADDR_H = VERA_INC1 | (unsigned char)((TEST_VRAM_SRC >> 16) & 0x01);
 
     /* 4. Set ADDR1 to destination, INC4 */
-    VERA_CTRL  = 0x01;      /* ADDRSEL=1 */
+    VERA_CTRL = 0x01; /* ADDRSEL=1 */
     VERA_ADDR_L = (unsigned char)(TEST_VRAM_DST & 0xFF);
     VERA_ADDR_M = (unsigned char)((TEST_VRAM_DST >> 8) & 0xFF);
     VERA_ADDR_H = VERA_INC4 | (unsigned char)((TEST_VRAM_DST >> 16) & 0x01);
@@ -400,14 +422,14 @@ static void test_cache_copy(void)
     READ_DATA0();
     READ_DATA0();
     READ_DATA0();
-    
+
     /* 6. Trigger 1 write (flushes cache) */
     VERA_DATA1 = 0;
 
     /* Restore normal mode to read back */
-    VERA_CTRL  = DCSEL_2;
+    VERA_CTRL = DCSEL_2;
     VERA_REG09 = 0x00;
-    
+
     r0 = vram_read(TEST_VRAM_DST + 0);
     r1 = vram_read(TEST_VRAM_DST + 1);
     r2 = vram_read(TEST_VRAM_DST + 2);
@@ -438,7 +460,8 @@ static void run_benchmarks(void)
     /* 1. Baseline: Single-byte write (INC1) */
     set_addr0(TEST_VRAM_DST, VERA_INC1);
     start_timer();
-    for (i = 0; i < BENCH_SIZE; ++i) {
+    for (i = 0; i < BENCH_SIZE; ++i)
+    {
         VERA_DATA0 = 0x55;
     }
     ticks = end_timer();
@@ -446,28 +469,34 @@ static void run_benchmarks(void)
     printf("Fill (INC1): %3u ticks\n", ticks);
 
     /* 2. Optimized: FX Cache fill (INC4, 4 bytes per write) */
-    VERA_CTRL  = DCSEL_6;
-    VERA_REG09 = 0xAA; VERA_REG0A = 0xBB; VERA_REG0B = 0xCC; VERA_REG0C = 0xDD;
-    VERA_CTRL  = DCSEL_2;
+    VERA_CTRL = DCSEL_6;
+    VERA_REG09 = 0xAA;
+    VERA_REG0A = 0xBB;
+    VERA_REG0B = 0xCC;
+    VERA_REG0C = 0xDD;
+    VERA_CTRL = DCSEL_2;
     VERA_REG09 = FX_CACHE_WR_EN;
     set_addr0(TEST_VRAM_DST, VERA_INC4);
     start_timer();
-    for (i = 0; i < BENCH_SIZE / 4; ++i) {
+    for (i = 0; i < BENCH_SIZE / 4; ++i)
+    {
         VERA_DATA0 = 0x00;
     }
     ticks = end_timer();
     sp = (ticks > 0) ? (unsigned int)((ticks_fill_inc1 * 10u) / ticks) : 0;
     printf("Fill (FX 4): %3u ticks (Speedup: %u.%ux)\n", ticks, sp / 10, sp % 10);
-    
+
     /* 3. Baseline Copy: Byte-by-byte (DATA0 -> DATA1, INC1) */
-    VERA_CTRL  = DCSEL_2; VERA_REG09 = 0x00;
+    VERA_CTRL = DCSEL_2;
+    VERA_REG09 = 0x00;
     set_addr0(TEST_VRAM_SRC, VERA_INC1);
-    VERA_CTRL  = 0x01; /* ADDRSEL=1 */
+    VERA_CTRL = 0x01; /* ADDRSEL=1 */
     VERA_ADDR_L = (unsigned char)(TEST_VRAM_DST & 0xFF);
     VERA_ADDR_M = (unsigned char)((TEST_VRAM_DST >> 8) & 0xFF);
     VERA_ADDR_H = VERA_INC1;
     start_timer();
-    for (i = 0; i < BENCH_SIZE; ++i) {
+    for (i = 0; i < BENCH_SIZE; ++i)
+    {
         VERA_DATA1 = VERA_DATA0;
     }
     ticks = end_timer();
@@ -475,15 +504,16 @@ static void run_benchmarks(void)
     printf("Copy (INC1): %3u ticks\n", ticks);
 
     /* 4. FX Cache Copy: (4x DATA0 -> 1x DATA1, INC4, 4 bytes per transfer) */
-    VERA_CTRL  = DCSEL_2;
+    VERA_CTRL = DCSEL_2;
     VERA_REG09 = FX_CACHE_FILL_EN | FX_CACHE_WR_EN;
     set_addr0(TEST_VRAM_SRC, VERA_INC1);
-    VERA_CTRL  = 0x01; /* ADDRSEL=1 */
+    VERA_CTRL = 0x01; /* ADDRSEL=1 */
     VERA_ADDR_L = (unsigned char)(TEST_VRAM_DST & 0xFF);
     VERA_ADDR_M = (unsigned char)((TEST_VRAM_DST >> 8) & 0xFF);
     VERA_ADDR_H = VERA_INC4;
     start_timer();
-    for (i = 0; i < BENCH_SIZE / 4; ++i) {
+    for (i = 0; i < BENCH_SIZE / 4; ++i)
+    {
         READ_DATA0();
         READ_DATA0();
         READ_DATA0();
@@ -494,25 +524,25 @@ static void run_benchmarks(void)
     sp = (ticks > 0) ? (unsigned int)((ticks_copy_inc1 * 10u) / ticks) : 0;
     printf("Copy (FX 4): %3u ticks (Speedup: %u.%ux)\n", ticks, sp / 10, sp % 10);
 
-    VERA_CTRL  = DCSEL_2;
+    VERA_CTRL = DCSEL_2;
     VERA_REG09 = 0x00;
-    VERA_CTRL  = DCSEL_0;
+    VERA_CTRL = DCSEL_0;
 }
 
 /* ------------------------------------------------------------------ */
 
 int main(void)
 {
-    putchar(14);            /* lower/upper case character set */
+    putchar(14); /* lower/upper case character set */
     vera_require();
 
     /* NOTE: do NOT write CTRL bit 7: on real VERA it reconfigures the whole
      * FPGA (reloads the bitstream, VRAM lost, bus dead for ~100 ms).
      * Start from a known FX state by writing the registers instead. */
-    VERA_CTRL  = DCSEL_2;
+    VERA_CTRL = DCSEL_2;
     VERA_REG09 = 0x00;
-    VERA_REG0C = 0x80;      /* ResetAccum trigger, mult/accum off */
-    VERA_CTRL  = DCSEL_0;
+    VERA_REG0C = 0x80; /* ResetAccum trigger, mult/accum off */
+    VERA_CTRL = DCSEL_0;
 
     printf("VERA FX coprocessor test\n");
     printf("========================\n");

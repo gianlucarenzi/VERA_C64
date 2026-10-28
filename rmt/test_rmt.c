@@ -17,9 +17,11 @@
 #include <conio.h>
 /* vera_detect.h compares the identity byte with 'V': the ASCII code, not
  * the PETSCII one cc65 makes of it on the C64 */
+/* clang-format off */
 #pragma charmap (0x56, 0x56)
 #include "vera_detect.h"
 #pragma charmap (0x56, 0xD6)
+/* clang-format on */
 #include "rmt.h"
 
 #ifndef RMT_SONG_NAME
@@ -46,7 +48,7 @@ int main(void)
     unsigned char k, speed;
 
     clrscr();
-    putchar(14);            /* lower case character set */
+    putchar(14); /* lower case character set */
     cputs("RMT player: VERA PSG on the C64\r\n");
     cputs("===============================\r\n");
     vera_require();
@@ -62,7 +64,8 @@ int main(void)
     cprintf("\r\nInstrument speed: %u\r\n", speed);
     rmt_irq_on();
 
-    for (;;) {
+    for (;;)
+    {
         gotoxy(0, 11);
         cprintf("PSG: %s  Stereo: %s", psg_enable ? "on " : "off", psg_stereo ? "on " : "off");
         gotoxy(0, 13);
@@ -83,7 +86,7 @@ int main(void)
             psg_stereo = (unsigned char)!psg_stereo;
     }
 
-    rmt_irq_off();          /* silences the PSG voices */
+    rmt_irq_off(); /* silences the PSG voices */
     clrscr();
     cputs("Music stopped.\r\n");
     return 0;

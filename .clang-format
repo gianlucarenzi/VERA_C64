@@ -1,0 +1,28 @@
+# .clang-format - the style of the C sources (clang-format 11 and later):
+# Allman braces, 4 spaces, no line length limit (the lines are broken by
+# hand), the defines and the trailing comments aligned, the includes in
+# their order.  The cc65 pragmas stay between "/* clang-format off */" and
+# "/* clang-format on */": clang-format would split "static-locals" into
+# "static - locals", and "charmap (" without the space reorders the string
+# literals of the programs (the same code, a different binary).
+BasedOnStyle: LLVM
+Language: Cpp
+IndentWidth: 4
+UseTab: Never
+ColumnLimit: 0
+BreakBeforeBraces: Allman
+IndentCaseLabels: false
+IndentPPDirectives: None
+SortIncludes: false
+ReflowComments: false
+PointerAlignment: Right
+SpaceAfterCStyleCast: false
+Cpp11BracedListStyle: false
+AlignConsecutiveMacros: true
+AlignTrailingComments: true
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: true
+AllowShortBlocksOnASingleLine: Never
+AllowShortFunctionsOnASingleLine: None
+AllowShortCaseLabelsOnASingleLine: true
+MaxEmptyLinesToKeep: 2
