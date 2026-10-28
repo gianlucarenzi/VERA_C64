@@ -78,9 +78,14 @@ periods, Blinky's "Elroy" speed-ups, the dot counters of the ghost house, the
 fruits of the last 7 levels at the bottom right. The attract mode (the
 characters and their nicknames, the chase of the power pellet) plays before a
 game, the three intermissions with their song after the levels 2, 5, 9, 13
-and 17. The 224x288 arcade screen is shown on layer 0, scaled to the 480
-lines of the VGA output; the three voices of the arcade sound chip play on the
-SID. It runs at 60 frames per second on the VSYNC of the VERA.
+and 17. The picture is 320x240, 2:1 on the VGA output, every pixel of the
+arcade as 2x2 with no fractional scaling: the maze on the left (layer 0, a
+4 bpp bitmap drawn from the tiles of the arcade; its 248 rows shown as 240,
+8 rows that cut no horizontal edge, dot or text dropped), the sprites as
+large as on the arcade, the HUD on the right (layer 1: scores, lives, the
+fruits of the levels; opaque, the sprites vanish behind it in the tunnel).
+The three voices of the arcade sound chip play on the SID. It runs at 60
+frames per second, polling the VSYNC flag of the VERA (no interrupts).
 
 The arcade ROMs are **not** in the repository. The build converts them from the
 MAME ROM set `pacman` (a file named `pacman.zip`, by default
@@ -388,7 +393,7 @@ $E000-$FFFF  - Kernal ROM
 **VERA VRAM:**
 ```
 $00000-$00FFF  - Reserved
-$00000-$05FFF  - Pac-Man: map, tiles, sprites (pacman.prg)
+$00000-$115FF  - Pac-Man: scene map, HUD map, tiles, sprites, HUD tiles, maze bitmap (pacman.prg)
 $01000-$01FFF  - RMT player font (rmtplay.prg)
 $1B000-$1EFFF  - Screen driver tilemap (vera80/60/40.prg)
 $1F000-$1FFFF  - Screen driver font

@@ -85,8 +85,8 @@ demo.vtm.prg: $(DEMO_SONG_SRC) tools/vtm_compile.py
 demo.vbm.prg: $(DEMO_IMAGE)
 	cp $< $@
 
-pacman.prg: test_pacman.c gen/pacgfx.s gen/pacgfx.h gen/pacsnd.s gen/pacsnd.h gen/pacscn.s gen/pacscn.h $(HEADERS)
-	$(CL65) $(CFLAGS) -Oirs -o $@ test_pacman.c gen/pacgfx.s gen/pacsnd.s gen/pacscn.s
+pacman.prg: test_pacman.c pacman_maze.o gen/pacgfx.s gen/pacgfx.h gen/pacsnd.s gen/pacsnd.h gen/pacscn.s gen/pacscn.h $(HEADERS)
+	$(CL65) $(CFLAGS) -Oirs -o $@ test_pacman.c pacman_maze.o gen/pacgfx.s gen/pacsnd.s gen/pacscn.s
 
 gen/pacgfx.s: pacman_gfx.py $(PACMAN_ZIP)
 	mkdir -p gen

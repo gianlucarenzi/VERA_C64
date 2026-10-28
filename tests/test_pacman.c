@@ -8,12 +8,18 @@
  * pacman_scenes.lua and played back from the streams of pacman_scene.py.  All
  * of them write to gen/.
  *
- * Picture: the 224x288 screen of the rotated arcade monitor on layer 0 (the
- * 256 tiles, 2 bpp, map 32x64 of which 28x36 are used), scaled by 128/77 to
- * the 480 lines of the VGA output.  The active area (DC_HSTART/HSTOP) is
- * 376 pixels wide, the arcade screen, so the sprites in the tunnel vanish at
- * the edges as on the arcade.  Sprites 16x16, 4 bpp.  The colour code of a
- * tile or sprite of the arcade is a palette offset (pacgfx.h).
+ * Picture: 320x240, 2:1 on the 640x480 of the VGA output, every pixel of
+ * the arcade as 2x2.  The maze on the left: its 248 rows shown as 240, 8 rows
+ * that cut no horizontal edge, dot or text dropped (pacgfx.h), drawn from the
+ * tiles of the arcade into a 4 bpp bitmap on layer 0, in the 16 colours of
+ * the arcade.  The game keeps the coordinates of the arcade; the sprites
+ * (16x16, 4 bpp, as large as on the arcade) are placed through the same
+ * table of rows.  The HUD on the right, layer 1 (the tiles again, 4 bpp):
+ * scores, lives, the fruits of the levels; it is opaque, and the sprites are
+ * between the two layers, so that they vanish behind it in the tunnel.  In
+ * the scenes layer 0 is the tile map of the arcade screen instead, from the
+ * top row of the maze.  The colour code of a tile or sprite of the arcade
+ * is a palette offset (pacgfx.h).
  *
  * Sound: the 3 voices of the Namco WSG on the 3 SID voices, frame by frame
  * (pacsnd.h): voice 0 the intro, the intermission song and the extra life,
@@ -24,10 +30,10 @@
  * speeds of Pac-Man and of the ghosts, the time the ghosts stay frightened
  * and their flashes, the scatter / chase periods, Blinky's "Elroy" speed-ups,
  * the dot counters of the ghost house; the intermissions after the levels 2,
- * 5, 9, 13 and 17; the fruits of the last 7 levels at the bottom right.
+ * 5, 9, 13 and 17; the fruits of the last 7 levels in the HUD.
  *
  * Joystick in port 2; fire starts a game.  The game runs at the VSYNC of the
- * VERA (60 Hz), with the IRQs of the C64 off.
+ * VERA (60 Hz, polling its VSYNC flag), with the IRQs of the C64 off.
  *
  * Simpler than the arcade: no cornering, the eyes of an eaten ghost do not
  * move while its score is shown, no split screen at level 256.
@@ -44,9 +50,14 @@
 #define JOY2   (*(volatile unsigned char *)0xDC00)
 #define SIDREG ((volatile unsigned char *)0xD400)
 
-#define VRAM_MAP     0x0000u /* layer 0: map 32x64, 2 bytes per entry */
+#define VRAM_MAP     0x0000u /* layer 0 in the scenes: map 32x64, 2 bytes per entry */
+#define VRAM_HUD     0x1000u /* layer 1: map 64x32, the HUD */
 #define VRAM_TILES   0x2000u /* 256 tiles 8x8, 2 bpp */
 #define VRAM_SPRITES 0x4000u /* 64 sprites 16x16, 4 bpp */
+#define VRAM_HTILES  0x6000u /* the 256 tiles again, 4 bpp, for the HUD */
+#define VRAM_BITMAP  0x8000u /* layer 0 in the game: the maze, 320x240 4 bpp, to $115FF */
+
+#define HUD_X 28 /* the first tile column of the HUD, right of the maze */
 
 /* tile codes of the arcade */
 #define T_BLANK 0x40
@@ -55,6 +66,7 @@
 #define T_WALL  0xC0 /* and above: walls and the ghost house door */
 #define T_DOOR1 0xCE
 #define T_DOOR2 0xCF
+#define T_CLEAR 0x7F /* a blank tile: clear on the HUD layer, over the maze */
 
 #define T_LIFE  0x20 /* 2x2: Pac-Man at the bottom left */
 #define T_FRUIT 0x90 /* 2x2 each, + sprite code * 4 */
@@ -197,32 +209,92 @@ static void vram_copy(unsigned int addr, const unsigned char *src, unsigned int 
     while (n--) VERA_DATA0 = *src++;
 }
 
-static void put_tile(unsigned char tx, unsigned char ty, unsigned char code, unsigned char pal)
+/* The maze bitmap: picture row o (0 to MAZE_SHOWN - 1), tile column tx; a
+ * row is 160 bytes, the bitmap goes past $FFFF into bank 1. */
+static void bm_at(unsigned char o, unsigned char tx)
 {
-    vram_at(VRAM_MAP + ((unsigned int)ty << 6) + (tx << 1), 0);
-    VERA_DATA0 = code;
-    VERA_DATA0 = pal << 4;
+    static unsigned int a;
+
+    a = ((unsigned int)o << 7) + ((unsigned int)o << 5) + (tx << 2);
+    VERA_CTRL = 0;
+    VERA_ADDR_L = (unsigned char)a;
+    VERA_ADDR_M = (unsigned char)(a >> 8) + (VRAM_BITMAP >> 8);
+    VERA_ADDR_H = VERA_INC1 | (a >= (unsigned int)(0x10000ul - VRAM_BITMAP));
 }
 
-/* The strings are written in lower case: cc65 turns them into PETSCII,
- * whose $41-$5A are the letters of the arcade tiles.  ' ' and '!' have tiles
- * of their own. */
+/* two 2 bpp pixels (a << 2 | b) of a palette group -> a byte of the bitmap,
+ * the arcade colours of a and b */
+static void make_pairs(unsigned char *p, unsigned char pal)
+{
+    static unsigned char a, b;
+    static const unsigned char *c;
+
+    c = pac_group_colour + pal * 4;
+    for (a = 0; a < 4; ++a)
+        for (b = 0; b < 4; ++b) *p++ = c[a] << 4 | c[b];
+}
+
+/* A tile of the arcade over the maze, at the screen tile (tx, ty), ty 3-33:
+ * its 8 rows in the bitmap, but the dropped ones (pacgfx.h). */
+static void put_tile(unsigned char tx, unsigned char ty, unsigned char code, unsigned char pal)
+{
+    static unsigned char pairs[16], pairs_pal = 0xFF, m, r;
+    static const unsigned char *t;
+
+    if (ty < 3 || ty > 33) return;
+    if (pal != pairs_pal)
+    {
+        make_pairs(pairs, pal);
+        pairs_pal = pal;
+    }
+    t = pac_tiles + ((unsigned int)code << 4);
+    m = (ty - 3) << 3;
+    for (r = 0; r < 8; ++r, ++m, t += 2)
+    {
+        if (m && pac_maze_out[m] == pac_maze_out[m - 1]) continue;
+        bm_at(pac_maze_out[m], tx);
+        VERA_DATA0 = pairs[t[0] >> 4];
+        VERA_DATA0 = pairs[t[0] & 15];
+        VERA_DATA0 = pairs[t[1] >> 4];
+        VERA_DATA0 = pairs[t[1] & 15];
+    }
+}
+
+/* the tile of a character: cc65 turns the lower case strings into PETSCII,
+ * whose $41-$5A are the letters of the arcade tiles, as $30-$39 are the
+ * digits; ' ' and '!' have tiles of their own */
+static unsigned char char_tile(unsigned char c)
+{
+    return c == ' ' ? T_BLANK : c == '!' ? 0x5B
+                                         : c;
+}
+
+/* a text over the maze */
 static void put_text(unsigned char tx, unsigned char ty, const char *s, unsigned char pal)
 {
     unsigned char c;
 
-    vram_at(VRAM_MAP + ((unsigned int)ty << 6) + (tx << 1), 0);
-    while ((c = *s++) != 0)
-    {
-        VERA_DATA0 = c == ' ' ? T_BLANK : c == '!' ? 0x5B
-                                                   : c;
-        VERA_DATA0 = pal << 4;
-    }
+    while ((c = *s++) != 0) put_tile(tx++, ty, char_tile(c), pal);
 }
 
-/* n tile codes of the arcade in a row */
-static void put_tiles(unsigned char tx, unsigned char ty, const unsigned char *t,
+/* n tile codes of the arcade in a row, over the maze */
+static void put_codes(unsigned char tx, unsigned char ty, const unsigned char *t,
                       unsigned char n, unsigned char pal)
+{
+    while (n--) put_tile(tx++, ty, *t++, pal);
+}
+
+/* the tiles of the maze again where a text was */
+static void clear_text(unsigned char tx, unsigned char ty, unsigned char n)
+{
+    unsigned char *m = mrow[ty] + tx;
+
+    while (n--) put_tile(tx++, ty, *m++, PAL_MAZE);
+}
+
+/* n tile codes of the arcade in a row on layer 0 in a scene (the map) */
+static void scene_tiles(unsigned char tx, unsigned char ty, const unsigned char *t,
+                        unsigned char n, unsigned char pal)
 {
     vram_at(VRAM_MAP + ((unsigned int)ty << 6) + (tx << 1), 0);
     while (n--)
@@ -232,25 +304,30 @@ static void put_tiles(unsigned char tx, unsigned char ty, const unsigned char *t
     }
 }
 
-/* the tiles of the maze again where a text was */
-static void clear_text(unsigned char tx, unsigned char ty, unsigned char n)
+/* the HUD on layer 1: a text, a score ending at column right, blank up to
+ * the last two digits */
+static void hud_at(unsigned char tx, unsigned char ty)
 {
-    unsigned char *m = mrow[ty] + tx;
+    vram_at(VRAM_HUD + ((unsigned int)ty << 7) + (tx << 1), 0);
+}
 
-    vram_at(VRAM_MAP + ((unsigned int)ty << 6) + (tx << 1), 0);
-    while (n--)
+static void hud_text(unsigned char tx, unsigned char ty, const char *s, unsigned char pal)
+{
+    unsigned char c;
+
+    hud_at(tx, ty);
+    while ((c = *s++) != 0)
     {
-        VERA_DATA0 = *m++;
-        VERA_DATA0 = PAL_MAZE << 4;
+        VERA_DATA0 = char_tile(c);
+        VERA_DATA0 = pal << 4;
     }
 }
 
-/* a score ending at column right, blank up to the last two digits */
 static void put_digits(unsigned char right, unsigned char ty, const unsigned char *d)
 {
     unsigned char k, lead = 1;
 
-    vram_at(VRAM_MAP + ((unsigned int)ty << 6) + ((right - 6) << 1), 0);
+    hud_at(right - 6, ty);
     for (k = 0; k < 7; ++k)
     {
         if (d[k] || k >= 5) lead = 0;
@@ -259,37 +336,96 @@ static void put_digits(unsigned char right, unsigned char ty, const unsigned cha
     }
 }
 
-/* the maze area, rows 2-33: the scores and the bottom rows stay */
+/* The whole maze in the bitmap, row after row of the picture: the 2 bpp
+ * rows of its tiles turned into the arcade colours, 4 pixels at a time, by
+ * maze_draw (pacman_maze.s) through the tables of maze_tables. */
+extern unsigned char mr_rlo[36], mr_rhi[36], mr_tlo[256], mr_thi[256];
+extern unsigned char mr_maze_a[256], mr_maze_b[256], mr_door_a[256], mr_door_b[256];
+void maze_draw(void);
+
+/* a 2 bpp byte -> its 2 bytes of the bitmap in the colours of pal */
+static void byte_tables(unsigned char *a, unsigned char *b, unsigned char pal)
+{
+    static unsigned char p[16];
+    unsigned char i = 0;
+
+    make_pairs(p, pal);
+    do
+    {
+        a[i] = p[i >> 4];
+        b[i] = p[i & 15];
+    } while (++i);
+}
+
+static void maze_tables(void)
+{
+    const unsigned char *t = pac_tiles;
+    unsigned char c = 0;
+
+    for (c = 0; c < 36; ++c)
+    {
+        mr_rlo[c] = (unsigned char)mrow[c];
+        mr_rhi[c] = (unsigned int)mrow[c] >> 8;
+    }
+    c = 0;
+    do
+    {
+        mr_tlo[c] = (unsigned char)t;
+        mr_thi[c] = (unsigned int)t >> 8;
+        t += 16;
+    } while (++c);
+    byte_tables(mr_maze_a, mr_maze_b, PAL_MAZE);
+    byte_tables(mr_door_a, mr_door_b, PAL_DOOR);
+}
+
+/* about 0.8 s: layer 0 is off meanwhile, the maze appears whole */
 static void draw_maze(void)
 {
-    unsigned char x, y, c;
-
-    for (y = 2; y < 34; ++y)
-    {
-        vram_at(VRAM_MAP + ((unsigned int)y << 6), 0);
-        for (x = 0; x < 32; ++x)
-        {
-            c = x < 28 ? mrow[y][x] : T_BLANK;
-            VERA_DATA0 = c;
-            VERA_DATA0 = (c == T_DOOR1 || c == T_DOOR2 ? PAL_DOOR : PAL_MAZE) << 4;
-        }
-    }
+    VERA_CTRL = 0;
+    VERA_DC_VIDEO &= ~0x10;
+    bm_at(0, 0);
+    maze_draw();
+    VERA_DC_VIDEO |= 0x10;
 }
 
 static void draw_status(void)
 {
-    put_text(3, 0, "1up", PAL_WHITE);
-    put_text(9, 0, "high score", PAL_WHITE);
-    put_digits(6, 1, score_d);
-    put_digits(16, 1, hi_d);
+    hud_text(HUD_X + 3, 1, "1up", PAL_WHITE);
+    hud_text(HUD_X + 1, 4, "high score", PAL_WHITE);
+    put_digits(HUD_X + 8, 2, score_d);
+    put_digits(HUD_X + 8, 5, hi_d);
 }
 
 /* the colour of the walls: blue, or white while the maze flashes */
 static void wall_colour(unsigned char white)
 {
-    vram_at(0xFA00u + PAL_MAZE * 32 + 3 * 2, 1);
-    VERA_DATA0 = white ? 0xDF : 0x2F; /* $dedeff / $2121ff */
-    VERA_DATA0 = white ? 0x0D : 0x02;
+    vram_at(0xFA00u + PAL_SCENE * 32 + WALL_COLOUR * 2, 1);
+    VERA_DATA0 = white ? 0xDF : pac_colours[WALL_COLOUR * 2]; /* $dedeff */
+    VERA_DATA0 = white ? 0x0D : pac_colours[WALL_COLOUR * 2 + 1];
+}
+
+/* layer 0: the maze bitmap, its colours the 16 of the arcade in the group
+ * SCENE (pac_colours) */
+static void mode_game(void)
+{
+    unsigned char i;
+
+    vram_at(0xFA00u + PAL_SCENE * 32, 1);
+    for (i = 0; i < 32; ++i) VERA_DATA0 = pac_colours[i];
+    VERA_L0_CONFIG = 0x06;                       /* bitmap, 4 bpp */
+    VERA_L0_TILEBASE = (VRAM_BITMAP >> 11) << 2; /* 320 wide */
+    VERA_L0_HSCR_H = PAL_SCENE;                  /* the palette offset */
+}
+
+/* layer 0: the tile map of the scenes, the arcade screen from the row of the
+ * top of the maze (the scenes use the rows 5-31) */
+static void mode_scene(void)
+{
+    VERA_L0_CONFIG = 0x41; /* map 32x64, 2 bpp tiles */
+    VERA_L0_MAPBASE = VRAM_MAP >> 9;
+    VERA_L0_TILEBASE = (VRAM_TILES >> 11) << 2; /* 8x8 */
+    VERA_L0_HSCR_H = 0;
+    VERA_L0_VSCR_L = MAZE_TOP;
 }
 
 static void wait_frame(void)
@@ -301,6 +437,7 @@ static void wait_frame(void)
 
 static void video_init(void)
 {
+    static unsigned char hud_p[16], a, b;
     unsigned int i;
     unsigned char out;
 
@@ -313,6 +450,17 @@ static void video_init(void)
 
     vram_copy(VRAM_TILES, pac_tiles, PAC_TILES_SIZE);
     vram_copy(VRAM_SPRITES, pac_sprites, PAC_SPRITES_SIZE);
+    /* the tiles of the HUD, 4 bpp: colour 0 is 4, black and opaque, so that
+     * the sprites go behind the HUD; T_CLEAR is all clear */
+    for (a = 0; a < 4; ++a)
+        for (b = 0; b < 4; ++b) hud_p[a << 2 | b] = (a ? a : 4) << 4 | (b ? b : 4);
+    vram_at(VRAM_HTILES, 0);
+    for (i = 0; i < PAC_TILES_SIZE; ++i)
+    {
+        a = pac_tiles[i];
+        VERA_DATA0 = (i >> 4) == T_CLEAR ? 0 : hud_p[a >> 4];
+        VERA_DATA0 = (i >> 4) == T_CLEAR ? 0 : hud_p[a & 15];
+    }
     vram_at(0xFA00u, 1); /* palette: PAL_GROUPS groups of 16, 4 used */
     for (i = 0; i < PAL_GROUPS * 4; ++i)
     {
@@ -328,30 +476,40 @@ static void video_init(void)
     for (i = 0; i < 1024; ++i) VERA_DATA0 = 0;
     vram_at(0xF9C0u, 1); /* PSG voices silent */
     for (i = 0; i < 64; ++i) VERA_DATA0 = 0;
-    vram_at(VRAM_MAP, 0); /* the whole map blank */
+    vram_at(VRAM_MAP, 0); /* the map of the scenes blank */
     for (i = 0; i < 32 * 64; ++i)
     {
         VERA_DATA0 = T_BLANK;
         VERA_DATA0 = 0;
     }
-
-    VERA_L0_CONFIG = 0x41; /* map 32x64, 2 bpp tiles */
-    VERA_L0_MAPBASE = VRAM_MAP >> 9;
-    VERA_L0_TILEBASE = (VRAM_TILES >> 11) << 2; /* 8x8 */
+    vram_at(VRAM_HUD, 0); /* the HUD: clear over the maze, black on the right */
+    for (i = 0; i < 64 * 32; ++i)
+    {
+        VERA_DATA0 = (i & 63) < HUD_X ? T_CLEAR : T_BLANK;
+        VERA_DATA0 = 0;
+    }
+    maze_tables(); /* the bitmap is written whole by draw_maze */
+    mode_scene();
     VERA_L0_HSCR_L = 0;
-    VERA_L0_HSCR_H = 0;
     VERA_L0_VSCR_L = 0;
     VERA_L0_VSCR_H = 0;
-    VERA_DC_HSCALE = 77; /* 288 lines -> 480 */
-    VERA_DC_VSCALE = 77;
+    VERA_L1_CONFIG = 0x12; /* map 64x32, 4 bpp tiles */
+    VERA_L1_MAPBASE = VRAM_HUD >> 9;
+    VERA_L1_TILEBASE = (VRAM_HTILES >> 11) << 2; /* 8x8 */
+    VERA_L1_HSCR_L = 0;
+    VERA_L1_HSCR_H = 0;
+    VERA_L1_VSCR_L = 0;
+    VERA_L1_VSCR_H = 0;
+    VERA_DC_HSCALE = 64; /* 2:1, 320x240 */
+    VERA_DC_VSCALE = 64;
     VERA_DC_BORDER = 0;
-    VERA_CTRL = 0x02;    /* DCSEL 1 */
-    VERA_DC_HSTART = 33; /* 132..508: 226 pixels of the layer */
-    VERA_DC_HSTOP = 127;
+    VERA_CTRL = 0x02; /* DCSEL 1: the whole 640x480 */
+    VERA_DC_HSTART = 0;
+    VERA_DC_HSTOP = 160;
     VERA_DC_VSTART = 0;
     VERA_DC_VSTOP = 240;
     VERA_CTRL = 0;
-    VERA_DC_VIDEO = out | 0x50; /* layer 0 and sprites */
+    VERA_DC_VIDEO = out | 0x70; /* layers 0 and 1, sprites */
 }
 
 /* ------------------------------------------------------------------ */
@@ -499,6 +657,7 @@ static void maze_reset(void)
     for (i = 0; i < sizeof maze; ++i)
         if (maze[i] == T_DOT || maze[i] == T_POWER) ++total_dots;
     dots = 0;
+    mode_game();
     draw_maze();
 }
 
@@ -812,9 +971,9 @@ static void add_score2(unsigned char tens, unsigned char hundreds)
     if (memcmp(score_d, hi_d, sizeof hi_d) > 0)
     {
         memcpy(hi_d, score_d, sizeof hi_d);
-        put_digits(16, 1, hi_d);
+        put_digits(HUD_X + 8, 5, hi_d);
     }
-    put_digits(6, 1, score_d);
+    put_digits(HUD_X + 8, 2, score_d);
 }
 
 static void add_score(unsigned char tens)
@@ -924,7 +1083,7 @@ static void sprite(void)
     VERA_DATA0 = (sp_x >> 8) & 3;
     VERA_DATA0 = (unsigned char)sp_y;
     VERA_DATA0 = (sp_y >> 8) & 3;
-    VERA_DATA0 = 0x0C | sp_flip; /* Z 3: in front of the layers */
+    VERA_DATA0 = 0x08 | sp_flip; /* Z 2: between the maze and the HUD */
     VERA_DATA0 = 0x50 | sp_pal;  /* 16x16 */
 }
 
@@ -961,7 +1120,7 @@ static void scene_sprites(void)
         sp_flip = sc_attr[s] & 3;
         sp_pal = sc_pal[s];
         sp_x = 247 - sc_p0[s] - (s < 3); /* MAME: the slots 0-2 one pixel left */
-        sp_y = 280 - sc_p1[s];
+        sp_y = 280 - sc_p1[s] - MAZE_TOP;
         sprite();
     }
 }
@@ -988,7 +1147,7 @@ static void draw_sprites(void)
             continue;
         }
         sp_x = gx[i];
-        sp_y = gy[i] + 24;
+        sp_y = pac_maze_out[gy[i]];
         sp_flip = 0;
         if (freeze && i == score_ghost)
         {
@@ -1020,7 +1179,7 @@ static void draw_sprites(void)
     else
     {
         sp_x = px;
-        sp_y = py + 24;
+        sp_y = pac_maze_out[py];
         sp_pal = PAL_PACMAN;
         sp_flip = 0;
         k = 0;
@@ -1056,7 +1215,7 @@ static void draw_sprites(void)
         sp_pal = pac_fruit_pal[lv_fruit];
         sp_flip = 0;
         sp_x = 112;
-        sp_y = FRUIT_Y + 24;
+        sp_y = pac_maze_out[FRUIT_Y];
         sprite();
     }
     else
@@ -1067,40 +1226,55 @@ static void draw_sprites(void)
     no_sprite();
 }
 
-/* The bottom rows as on the arcade, only when they change: the lives left
- * (but the one playing) from the left, the fruits of the last 7 levels from
- * the right, the current level the leftmost.  2x2 tiles: the left column is
- * code + 1, the right one code, the lower row + 2. */
+/* The HUD below the scores, only when it changes: the lives left (but the
+ * one playing), the fruits of the last 7 levels, the current level first, 4
+ * and 3 in two rows.  2x2 tiles: the left column is code + 1, the right one
+ * code, the lower row + 2. */
+#define HUD_LIVES_Y  8
+#define HUD_FRUITS_Y 22
+
 static void draw_hud(void)
 {
-    static unsigned char key_lives = 0xFF, key_level, y, x, t, pal, first, l;
+    static unsigned char key_lives = 0xFF, key_level, y, x, t, pal, k, l;
 
     if (!hud_dirty && key_lives == lives && key_level == level) return;
     hud_dirty = 0;
     key_lives = lives;
     key_level = level;
 
-    first = level > 7 ? level - 6 : 1;
-    for (y = 34; y < 36; ++y)
+    for (y = 0; y < 2; ++y)
     {
-        vram_at(VRAM_MAP + ((unsigned int)y << 6), 0);
-        for (x = 0; x < 28; ++x)
+        hud_at(HUD_X, HUD_LIVES_Y + y);
+        for (x = 0; x < 12; ++x)
         {
             t = T_BLANK;
             pal = 0;
-            if (in_game && phase != PH_SCENE && x >= 2 && x < 12 && x < lives * 2)
+            if (in_game && phase != PH_SCENE && x >= 1 && x < 11 && x < lives * 2 - 1)
             {
-                t = T_LIFE;
+                t = T_LIFE + !((x - 1) & 1) + (y << 1);
                 pal = PAL_PACMAN;
             }
-            else if (in_game && x >= 12 && x < 26 &&
-                     (l = first + ((25 - x) >> 1)) <= level)
+            VERA_DATA0 = t;
+            VERA_DATA0 = pal << 4;
+        }
+    }
+    for (y = 0; y < 5; ++y) /* two rows of 2x2, a blank row between */
+    {
+        hud_at(HUD_X, HUD_FRUITS_Y + y);
+        for (x = 0; x < 12; ++x)
+        {
+            t = T_BLANK;
+            pal = 0;
+            k = (x - 2) >> 1; /* the fruit of the row */
+            if (y >= 3) k += 4;
+            if (in_game && y != 2 && x >= 2 && x < 10 && k < 7 && k < level &&
+                (y < 3 || x < 8))
             {
+                l = level - k;
                 l = l > FRUIT_LEVELS ? FRUIT_LEVELS - 1 : l - 1;
-                t = T_FRUIT + pac_fruit_spr[l] * 4;
+                t = T_FRUIT + pac_fruit_spr[l] * 4 + !(x & 1) + ((y == 1 || y == 4) << 1);
                 pal = pac_fruit_pal[l];
             }
-            if (t != T_BLANK) t += !(x & 1) + ((y - 34) << 1);
             VERA_DATA0 = t;
             VERA_DATA0 = pal << 4;
         }
@@ -1150,6 +1324,7 @@ static void scene_start(unsigned char id)
         sc_pal[x] = SCN_HIDDEN;
         sc_v0[x] = sc_v1[x] = 0;
     }
+    mode_scene();
     scn_id = id;
     scn_p = (const unsigned char *)(scn_ptr_lo[id] | (scn_ptr_hi[id] << 8));
     scn_wait = 0;
@@ -1215,11 +1390,11 @@ static unsigned char scene_frame(void)
             switch (op)
             {
             case SCN_TILE:
-                put_tiles(p[0], p[1], p + 2, 1, p[3]);
+                scene_tiles(p[0], p[1], p + 2, 1, p[3]);
                 p += 4;
                 break;
             case SCN_TEXT:
-                put_tiles(p[0], p[1], p + 4, p[2], p[3]);
+                scene_tiles(p[0], p[1], p + 4, p[2], p[3]);
                 p += 4 + p[2];
                 break;
             case SCN_MUSIC:
@@ -1348,8 +1523,13 @@ static void title(void)
     scene_start(SCN_ATTRACT);
 }
 
+/* the sprites of the scene hidden first: drawing the maze takes a while */
 static void scene_end(void)
 {
+    unsigned char s;
+
+    vram_at(0xFC00u, 1);
+    for (s = 0; s < SP_SCENE; ++s) no_sprite();
     if (scn_id == SCN_ATTRACT)
     {
         maze_reset();
@@ -1392,7 +1572,7 @@ static void collisions(void)
         fruit_left = 0;
         k = pac_fruit_pts[lv_fruit];
         add_score2(0, pac_fruit_points[k]);
-        put_tiles(POINTS_X, 20, pac_point_tiles + k * 4, 4, PAL_PINKY);
+        put_codes(POINTS_X, 20, pac_point_tiles + k * 4, 4, PAL_PINKY);
         points_t = 120;
         snd_effect(SND_FRUIT);
     }
